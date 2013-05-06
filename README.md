@@ -77,7 +77,7 @@ Some stuff I would like to add to `gcm-erlang`:
 2. improved and adaptive construction of the JSON messages
 3. resending of all the message not sent due to `GCM` timeout using exponential backoff
 
-In some cases when you receive a success/error message we should update/remove in our database the `Registration Ids`. I did not implement this because it depends on your needs. Problably I will store in different `ets tables` some information so that you will be able to inspect them and update your database. Feel free to edit in `gcm.erl` the functions `parse_results/2` and handle_error/2 if you want to handle the error in you own way.
+In some cases when you receive a success/error message we should update/remove in our database the `Registration Ids`. I did not implement this because it depends on your needs. Problably I will store in different `ets tables` some information so that you will be able to inspect them and update your database. Feel free to edit in `gcm.erl` the functions `parse_results/2` and `handle_error/2` if you want to handle these issues in you own way.
 
 ### Note:
 
