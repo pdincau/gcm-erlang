@@ -1,7 +1,7 @@
 gcm-erlang
 =======
 
-This software provides an Erlang client for [`GOOGLE CLOUD MESSAGING`](http://developer.apple.com/library/mac/#documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/CommunicatingWIthAPS/CommunicatingWIthAPS.html "Google Cloud Messaging for Android").
+This software provides an Erlang client for [`GOOGLE CLOUD MESSAGING`](http://developer.android.com/google/gcm/index.html "Google Cloud Messaging for Android").
 
 
 ### What can you already do with gcm-erlang:
