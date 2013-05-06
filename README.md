@@ -67,7 +67,7 @@ By looking at the code in `gcm.erl` you can easily change the JSON in order to s
 
 `gcm-erlang` will push the message for you to `Google Cloud Messaging` servers and will parse the JSON provided as result.
 
-In case of errors or if some of the Registration Ids must be updated `gcm-erlang` will print a message on the standard output. I will add some better logging in the future (problably using `Lager` but other suggestions are more than accepted).
+In case of errors or if some of the `Registration Ids` must be updated `gcm-erlang` will print a message on the standard output. I will add some better logging in the future (problably using `Lager` but other suggestions are more than accepted).
 
 ### Possible future improvements:
 
@@ -76,6 +76,8 @@ Some stuff I would like to add to `gcm-erlang`:
 1. better logging
 2. improved and adaptive construction of the JSON messages
 3. resending of all the message not sent due to `GCM` timeout using exponential backoff
+
+In some cases when you receive a success/error message we should update/remove in our database the `Registration Ids`. I did not implement this because it depends on your needs. Problably I will store in different `ets tables` some information so that you will be able to inspect them and update your database. Feel free to edit in `gcm.erl` the functions `parse_results/2` and handle_error/2 if you want to handle the error in you own way.
 
 ### Note:
 
