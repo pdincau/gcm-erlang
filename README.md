@@ -9,7 +9,7 @@ This software provides an Erlang client for [`GOOGLE CLOUD MESSAGING`](http://de
 Using `gcm-erlang` you can:
 
 1. start several `gen_servers` representing different `GCM applications` defined by different `GCM API keys`
-2. send notification messages to Android mobile devices registered with a specific application and registered using a specific `registration id`
+2. send notification messages to Android mobile devices registered to your specific application and registered to `GCM` using a specific `registration id`
 
 So far `gcm-erlang` does only provide support for JSON messages since GCM does not allow to send multicast messages using plain text.
 
