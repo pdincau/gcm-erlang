@@ -184,7 +184,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 build_gcm_request(Message, RegIds) ->
     Struct = {struct, [{<<"registration_ids">>, RegIds},
-                       {<<"data">>, {struct, [{<<"message">>, Message}]}},
+                       {<<"data">>, {struct, Message}},
                        {<<"time_to_live">>, ?TTL},
                        {<<"collapse_key">>, ?COLLAPSE_KEY}]},
     iolist_to_binary(mochijson2:encode(Struct)).
