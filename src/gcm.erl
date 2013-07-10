@@ -19,7 +19,7 @@
 
 -define(SERVER, ?MODULE). 
 
--define(BASEURL, "http://android.googleapis.com/gcm/send").
+-define(BASEURL, "https://android.googleapis.com/gcm/send").
 -define(TTL, 3600).
 -define(COLLAPSE_KEY, <<"your_update">>).
 
