@@ -11,7 +11,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start/2, stop/1, start_link/2, push/3]).
+-export([start/2, start/3, stop/1, start_link/2, start_link/3, push/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -19,17 +19,20 @@
 
 -define(SERVER, ?MODULE). 
 
--define(BASEURL, "http://android.googleapis.com/gcm/send").
+-define(BASEURL, "https://android.googleapis.com/gcm/send").
 -define(TTL, 3600).
 -define(COLLAPSE_KEY, <<"your_update">>).
 
--record(state, {key, retry_after}).
+-record(state, {key, retry_after, error_fun}).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 start(Name, Key) ->
-    gcm_sup:start_child(Name, Key).
+    start(Name, Key, fun handle_error/2).
+
+start(Name, Key, ErrorFun) ->
+    gcm_sup:start_child(Name, Key, ErrorFun).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -39,7 +42,10 @@ start(Name, Key) ->
 %% @end
 %%--------------------------------------------------------------------
 start_link(Name, Key) ->
-    gen_server:start_link({local, Name}, ?MODULE, [Key], []).
+    start_link(Name, Key, fun handle_error/2).
+
+start_link(Name, Key, ErrorFun) ->
+    gen_server:start_link({local, Name}, ?MODULE, [Key, ErrorFun], []).
 
 stop(Name) ->
     gen_server:call(Name, stop).
@@ -62,8 +68,8 @@ push(Name, RegIds, Message) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Key]) ->
-    {ok, #state{key=Key, retry_after=0}}.
+init([Key, ErrorFun]) ->
+    {ok, #state{key=Key, retry_after=0, error_fun=ErrorFun}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -96,46 +102,47 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({send, RegIds, Message}, #state{key=Key} = State) ->
-    GCMRequest = build_gcm_request(Message, RegIds),
+handle_cast({send, RegIds, Message}, #state{key=Key, error_fun=ErrorFun} = State) ->
+    lager:info("Message=~p; RegIds=~p~n", [Message, RegIds]),
+    GCMRequest = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
     ApiKey = string:concat("key=", Key),
 
     try httpc:request(post, {?BASEURL, [{"Authorization", ApiKey}], "application/json", GCMRequest}, [], []) of
         {ok, {{_, 200, _}, Headers, GCMResponse}} ->
-            {struct, Json} = mochijson2:decode(GCMResponse),
+            Json = jsx:decode(GCMResponse),
             {_Multicast, _Success, Failure, Canonical, Results} = get_response_fields(Json),
             case to_be_parsed(Failure, Canonical) of
                 true ->
-                    %% get retry-after header for future development
-                    _RetryAfter = proplists:get_value("retry-after", Headers),
-                    parse_results(Results, RegIds),
+                    parse_results(Results, RegIds, ErrorFun),
                     {noreply, State};
                 false ->
                     {noreply, State}
             end;
         {error, Reason} ->
             %% Some general error during the request.
-            %% Stop the gen_server
-            {stop, Reason, State};
+            lager:error("error in request: ~p~n", [Reason]),
+            {noreply, State};
         {ok, {{_, 400, _}, _, _}} ->
             %% Some error in the Json.
-            %% Keep on working.
             {noreply, State};
         {ok, {{_, 401, _}, _, _}} ->
             %% Some error in the authorization.
-            %% Stop the gen_server.
-            {stop, authorization, State};
+            lager:error("authorization error!", []),
+            {noreply, State};
+        {ok, {{_, Code, _}, _, _}} when Code >= 500 andalso Code =< 599 ->
+            %% TODO: retry with exponential back-off
+            {noreply, State};
         {ok, {{_StatusLine, _, _}, _, _Body}} ->
             %% Request handled but some error like timeout happened.
-            %% keep on working.
             {noreply, State};
         OtherError ->
             %% Some other nasty error.
-            {stop, OtherError, State}
+            lager:error("other error: ~p~n", [OtherError]),
+            {noreply, State}
     catch
         Exception ->
-            %% Stop the gen_server.
-            {stop, Exception, State}
+            lager:error("exception ~p in call to URL: ~p~n", [Exception, ?BASEURL]),
+            {noreply, State}
     end;
 
 handle_cast(_Msg, State) ->
@@ -182,71 +189,64 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-build_gcm_request(Message, RegIds) ->
-    Struct = {struct, [{<<"registration_ids">>, RegIds},
-                       {<<"data">>, {struct, [{<<"message">>, Message}]}},
-                       {<<"time_to_live">>, ?TTL},
-                       {<<"collapse_key">>, ?COLLAPSE_KEY}]},
-    iolist_to_binary(mochijson2:encode(Struct)).
-
 get_response_fields(Json) ->
-    Multicast = proplists:get_value(<<"multicast_id">>, Json),
-    Success = proplists:get_value(<<"success">>, Json),
-    Failure = proplists:get_value(<<"failure">>, Json),
-    Canonical = proplists:get_value(<<"canonical_ids">>, Json),
-    Results = proplists:get_value(<<"results">>, Json),
-    {Multicast, Success, Failure, Canonical, Results}.
+    {
+        proplists:get_value(<<"multicast_id">>, Json),
+        proplists:get_value(<<"success">>, Json),
+        proplists:get_value(<<"failure">>, Json),
+        proplists:get_value(<<"canonical_ids">>, Json),
+        proplists:get_value(<<"results">>, Json)
+    }.
 
-to_be_parsed(Failure, Canonical) ->
-    case {Failure, Canonical} of
-        {0, 0} ->
-            false;
-        _ ->
-            true
-    end.
+to_be_parsed(0, 0) -> false;
+to_be_parsed(_Failure, _Canonical) -> true.
 
-parse_results([Result|Results], [RegId|RegIds]) ->
-    case Result of
-        {struct, [{<<"error">>, Error}]} ->
-            handle_error(Error, RegId),
-            parse_results(Results, RegIds);
-        {struct, [{<<"message_id">>, _Id}]} ->
-	    io:format("Message sent.~n", []),
-            parse_results(Results, RegIds);
-        {struct, [{<<"message_id">>, _Id}, {<<"registration_id">>, NewRegId}]} ->
-	    io:format("Message sent. Update id ~p with new id ~p.~n", [RegId, NewRegId]),
-            parse_results(Results, RegIds);
-        {struct, [{<<"registration_id">>, NewRegId}, {<<"message_id">>, _Id}]} ->
-            io:format("Message sent. Update id ~p with new id ~p.~n", [RegId, NewRegId]),
-            parse_results(Results, RegIds)
+parse_results([Result|Results], [RegId|RegIds], ErrorFun) ->
+    case {
+        proplists:get_value(<<"error">>, Result),
+        proplists:get_value(<<"message_id">>, Result),
+        proplists:get_value(<<"registration_id">>, Result)
+    } of
+        {Error,undefined,undefined} when Error =/= undefined ->
+            ErrorFun(Error, RegId),
+            parse_results(Results, RegIds, ErrorFun);
+        {undefined,MessageId,undefined} when MessageId =/= undefined -> 
+            lager:info("Message sent.~n", []),
+            parse_results(Results, RegIds, ErrorFun);
+        {undefined,MessageId,NewRegId} when MessageId =/= undefined andalso NewRegId =/= undefined ->
+            ErrorFun(<<"NewRegistrationId">>, {RegId, NewRegId}),
+            parse_results(Results, RegIds, ErrorFun)
     end;
-
-parse_results([], []) ->
+parse_results([], [], _ErrorFun) ->
     ok.
 
-handle_error(<<"Unavailable">>, _RegId) ->
+handle_error(<<"NewRegistrationId">>, {RegId, NewRegId}) ->
+    lager:info("Message sent. Update id ~p with new id ~p.~n", [RegId, NewRegId]),
+    ok;
+
+handle_error(<<"Unavailable">>, RegId) ->
     %% The server couldn't process the request in time. Retry later with exponential backoff.
-    io:format("Error: Unavailable.~n", []),
+    lager:error("unavailable ~p~n", [RegId]),
     ok;
 
-handle_error(<<"InternalServerError">>, _RegId) ->
+handle_error(<<"InternalServerError">>, RegId) ->
     % GCM had an internal server error. Retry later with exponential backoff.
-    io:format("Error: Internal server error.~n", []),
+    lager:error("internal server error ~p~n", [RegId]),
     ok;
 
-handle_error(<<"InvalidRegistration">>, _RegId) ->
-    %% Invalid registration id in database. Should log.
-    io:format("Error: Invalid registration.~n", []),
+handle_error(<<"InvalidRegistration">>, RegId) ->
+    %% Invalid registration id in database.
+    lager:error("invalid registration ~p~n", [RegId]),
     ok;
 
-handle_error(<<"NotRegistered">>, _RegId) ->
+handle_error(<<"NotRegistered">>, RegId) ->
     %% Application removed. Delete device from database.
-    io:format("Error: Not registered.~n", []),
+    lager:error("not registered ~p~n", [RegId]),
     ok;
 
-handle_error(UnexpectedError, _RegId) ->
+handle_error(UnexpectedError, RegId) ->
     %% There was an unexpected error that couldn't be identified.
-    io:format("Error: unexpected error ~p.~n", [UnexpectedError]),
+    lager:error("unexpected error ~p in ~p~n", [UnexpectedError, RegId]),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
