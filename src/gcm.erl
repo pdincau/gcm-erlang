@@ -235,7 +235,7 @@ handle_error(<<"InternalServerError">>, RegId) ->
     ok;
 
 handle_error(<<"InvalidRegistration">>, RegId) ->
-    %% Invalid registration id in database. Should log.
+    %% Invalid registration id in database.
     lager:error("invalid registration ~p~n", [RegId]),
     ok;
 
