@@ -1,12 +1,14 @@
-{application, gcm,
- [
-  {description, "An Erlang client for Google Cloud Messaging (GCM)"},
-  {vsn, "1.0.0"},
-  {registered, [gcm_sup]},
-  {applications, [
-                  kernel,
-                  stdlib
-                 ]},
-  {mod, {gcm_app, []}},
-  {env, []}
- ]}.
+{application, gcm, [
+    {description, "An Erlang client for Google Cloud Messaging (GCM)"},
+    {vsn, "1.0.0"},
+    {registered, [gcm_sup]},
+    {applications, [
+        kernel,
+        stdlib,
+        inets,
+        jsx,
+        lager
+    ]},
+    {mod, {gcm_app, []}},
+    {env, []}
+]}.
