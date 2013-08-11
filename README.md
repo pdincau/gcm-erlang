@@ -48,7 +48,7 @@ At any time you can send a GCM message to one or more mobile devices by calling:
 
     7> gcm:push(RegisteredName, RegIds, Message).
 
-Where `RegistereName` is the atom used during registration, `RegIds` is a list (max 1000 elements) of Registration Ids specified as Erlang binaries and `Message` is an Erlang term representing the data you want to send to the device. 
+Where `RegistereName` is the atom used during registration, `RegIds` is a list (max 1000 elements) of Registration Ids specified as Erlang binaries (e.g., `<<"APA91bHun4MxP5egoKMwt2KZFBaFUH-1RYqx...">>` and `Message` is an Erlang term representing the data you want to send to the device. 
 
 The JSON message is built using `jsx` in the module `gcm.erl` and in the end will have the following form:
 
