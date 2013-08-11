@@ -40,9 +40,8 @@ send_message_correct(Pid) ->
 		end),
     gcm:push(test, [<<"Token">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
     receive 
-	Any -> ?_assertMatch({ok, {{_,200,_}, [], _JSON}}, Any)
-    end,
-    ?_assert(meck:validate(httpc)).
+	Any -> [?_assertMatch({ok, {{_,200,_}, [], _JSON}}, Any), ?_assert(meck:validate(httpc))]
+    end.
 
 send_message_wrong_json(Pid) ->
     meck:expect(httpc, request, 
@@ -51,9 +50,8 @@ send_message_wrong_json(Pid) ->
 		end),
     gcm:push(test, [<<"Token">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
     receive 
-        Any -> ?_assertMatch({ok, {{_, 400, _}, [], []}}, Any)
-    end,
-    ?_assert(meck:validate(httpc)).    
+        Any -> [?_assertMatch({ok, {{_, 400, _}, [], []}}, Any), ?_assert(meck:validate(httpc))]
+    end.    
 
 send_message_wrong_auth(Pid) ->
     meck:expect(httpc, request, 
@@ -62,9 +60,8 @@ send_message_wrong_auth(Pid) ->
 		end),
     gcm:push(test, [<<"Token">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
     receive 
-        Any -> ?_assertMatch({ok, {{_, 401, _}, [], []}}, Any)
-    end,
-    ?_assert(meck:validate(httpc)).
+        Any -> [?_assertMatch({ok, {{_, 401, _}, [], []}}, Any), ?_assert(meck:validate(httpc))]
+    end.
 
 send_message_gcm_down(Pid) ->
     meck:expect(httpc, request, 
@@ -73,6 +70,5 @@ send_message_gcm_down(Pid) ->
 		end),
     gcm:push(test, [<<"Token">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
     receive
-        Any -> ?_assertMatch({ok, {{_, 503, _}, [], []}}, Any)
-    end,
-    ?_assert(meck:validate(httpc)).
+        Any -> [?_assertMatch({ok, {{_, 503, _}, [], []}}, Any), ?_assert(meck:validate(httpc))]
+    end.
