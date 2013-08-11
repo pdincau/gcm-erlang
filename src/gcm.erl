@@ -109,7 +109,7 @@ handle_cast({send, RegIds, Message}, #state{key=Key, error_fun=ErrorFun} = State
 
     try httpc:request(post, {?BASEURL, [{"Authorization", ApiKey}], "application/json", GCMRequest}, [], []) of
         {ok, {{_, 200, _}, Headers, GCMResponse}} ->
-            Json = jsx:decode(GCMResponse),
+            Json = jsx:decode(response_to_binary(GCMResponse)),
             {_Multicast, _Success, Failure, Canonical, Results} = get_response_fields(Json),
             case to_be_parsed(Failure, Canonical) of
                 true ->
@@ -189,6 +189,12 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+response_to_binary(Json) when is_binary(Json) ->
+    Json;
+
+response_to_binary(Json) when is_list(Json) ->
+    list_to_binary(Json).
+
 get_response_fields(Json) ->
     {
         proplists:get_value(<<"multicast_id">>, Json),
