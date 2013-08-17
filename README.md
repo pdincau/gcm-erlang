@@ -16,7 +16,7 @@ So far `gcm-erlang` does only provide support for JSON messages since GCM does n
 ### How to compile the application gcm-erlang:
 
 The first thing you have to do is to compile all the Erlang files using `rebar`.
-    
+
     $ ./rebar get-deps compile
 
 ### How to run the application gcm-erlang:
@@ -48,7 +48,7 @@ At any time you can send a GCM message to one or more mobile devices by calling:
 
     7> gcm:push(RegisteredName, RegIds, Message).
 
-Where `RegistereName` is the atom used during registration, `RegIds` is a list (max 1000 elements) of Registration Ids specified as Erlang binaries (e.g., `<<"APA91bHun4MxP5egoKMwt2KZFBaFUH-1RYqx...">>` and `Message` is an Erlang term representing the data you want to send to the device. 
+Where `RegistereName` is the atom used during registration, `RegIds` is a list (max 1000 elements) of Registration Ids specified as Erlang binaries (e.g., `<<"APA91bHun4MxP5egoKMwt2KZFBaFUH-1RYqx...">>`) and `Message` is an Erlang term representing the data you want to send to the device.
 
 The JSON message is built using `jsx` in the module `gcm.erl` and in the end will have the following form:
 
@@ -74,7 +74,7 @@ In case of errors you can catch the output with a callback function. You only ne
     9> Callback = fun(Error, RegId) -> io:format("~p ~p~n", [RegId, Error]) end.
     10> gcm:start(foo, "apikey", Callback).
 
-The first param is always a binary with the error and the second param can be a binary with the Registered ID or a tuple refering to the Old Registered ID and the New Registered ID. All of the errors you can handle are in this list are: 
+The first param is always a binary with the error and the second param can be a binary with the Registered ID or a tuple refering to the Old Registered ID and the New Registered ID. All of the errors you can handle are in this list are:
 
 - `NewRegistrationId`, send the OldRegID and NewRegID as a tuple in the second param.
 - `Unavailable`, you should retry the request (use exponential back-off).
