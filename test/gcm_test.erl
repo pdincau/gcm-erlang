@@ -3,94 +3,77 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+-define(setup(F), {setup, fun start/0, fun stop/1, F}).
+
 init_and_stop_test() ->
     ?assertMatch({ok, _}, gcm:start_link(test, "APIKEY")),
     ?assertEqual(stopped, gcm:stop(test)),
     ?assertEqual(undefined, whereis(test)).
 
-gcm_simple_message_test() ->
+start() ->
     {ok, _} = gcm:start_link(test, "APIKEY"),
-    PID = self(),
     meck:new(httpc),
-    meck:expect(httpc, request, fun
-        (post, {_BaseURL, _AuthHeader, "application/json", JSON}, [], []) ->
-            Reply = [
-                {<<"multicast_id">>, <<"whatever">>},
-                {<<"success">>, 1},
-                {<<"results">>, [
-                    [{<<"message_id">>, <<"1:0408">>}]
-                ]}
-            ],
-            PID ! {ok, {{"", 200, ""}, [], jsx:encode(Reply)}}
-    end),
-    gcm:push(test, [<<"Token">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
-    receive 
-        Any -> ?assertMatch({ok, {{_,200,_}, [], _JSON}}, Any)
-    end,
-    meck:unload(httpc), 
-    gcm:stop(test),
-    ok.
+    _Pid = self().
 
-gcm_simple_error401_message_test() ->
-    {ok, _} = gcm:start_link(test, "APIKEY"),
-    PID = self(),
-    meck:new(httpc),
-    meck:expect(httpc, request, fun
-        (post, {_BaseURL, _AuthHeader, "application/json", JSON}, [], []) ->
-            PID ! {ok, {{"", 401, ""}, [], []}}
-    end),
-    gcm:push(test, [<<"Token">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
-    receive 
-        Any -> ?assertMatch({ok, {{_,401,_}, [], []}}, Any)
-    end,
-    meck:unload(httpc), 
-    gcm:stop(test),
-    ok.
+stop(_) ->
+    meck:unload(httpc),
+    gcm:stop(test).
 
-gcm_simple_error400_message_test() ->
-    {ok, _} = gcm:start_link(test, "APIKEY"),
-    PID = self(),
-    meck:new(httpc),
-    meck:expect(httpc, request, fun
-        (post, {_BaseURL, _AuthHeader, "application/json", JSON}, [], []) ->
-            PID ! {ok, {{"", 400, ""}, [], []}}
-    end),
-    gcm:push(test, [<<"Token">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
-    receive 
-        Any -> ?assertMatch({ok, {{_,400,_}, [], []}}, Any)
-    end,
-    meck:unload(httpc), 
-    gcm:stop(test),
-    ok.
+gcm_message_test_() ->
+    [{"It gets a 200 when message is correct", ?setup(fun send_valid_message/1)},
+     {"It gets a 400 when message contains malformed json", ?setup(fun send_malformed_json/1)},
+     {"It gets a 401 when message has wrong auth", ?setup(fun send_wrong_auth/1)},
+     {"It gets a 503 when GCM servers are down", ?setup(fun send_gcm_down/1)}].
 
-gcm_simple_error503_message_test() ->
-    {ok, _} = gcm:start_link(test, "APIKEY"),
-    PID = self(),
-    meck:new(httpc),
-    meck:expect(httpc, request, fun
-        (post, {_BaseURL, _AuthHeader, "application/json", JSON}, [], []) ->
-            PID ! {ok, {{"", 503, ""}, [], []}}
-    end),
+send_valid_message(Pid) ->
+    meck:expect(httpc, request,
+		fun(post, {_BaseURL, _AuthHeader, "application/json", _JSON}, [], []) ->
+			Reply = <<"{\"multicast_id\":\"whatever\",\"success\":1,\"results\":[{\"message_id\":\"1:0408\"}]}">>,
+			Pid ! {ok, {{"", 200, ""}, [], Reply}}
+		end),
     gcm:push(test, [<<"Token">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
-    receive 
-        Any -> ?assertMatch({ok, {{_,503,_}, [], []}}, Any)
-    end,
-    meck:unload(httpc), 
-    gcm:stop(test),
-    ok.
+    receive
+        Any -> [
+                {"Status is 200", ?_assertMatch({ok, {{_,200,_}, [], _JSON}}, Any)},
+                {"Validate httpc", ?_assert(meck:validate(httpc))}
+               ]
+    end.
 
-gcm_simple_processed_message_test() ->
-    {ok, _} = gcm:start_link(test, "APIKEY"),
-    PID = self(),
-    meck:new(httpc),
-    meck:expect(httpc, request, fun
-        (post, {_BaseURL, _AuthHeader, "application/json", JSON}, [], []) ->
-            PID ! {ok, {{"", 203, ""}, [], []}}
-    end),
+send_malformed_json(Pid) ->
+    meck:expect(httpc, request,
+		fun(post, {_BaseURL, _AuthHeader, "application/json", _MalformedJSON}, [], []) ->
+			Pid ! {ok, {{"", 400, ""}, [], []}}
+		end),
     gcm:push(test, [<<"Token">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
-    receive 
-        Any -> ?assertMatch({ok, {{_,203,_}, [], []}}, Any)
-    end,
-    meck:unload(httpc), 
-    gcm:stop(test),
-    ok.
+    receive
+        Any -> [
+                {"Status is 400", ?_assertMatch({ok, {{_, 400, _}, [], []}}, Any)},
+                {"Validate httpc", ?_assert(meck:validate(httpc))}
+               ]
+    end.
+
+send_wrong_auth(Pid) ->
+    meck:expect(httpc, request,
+		fun(post, {_BaseURL, _WrongAuthHeader, "application/json", _JSON}, [], []) ->
+			Pid ! {ok, {{"", 401, ""}, [], []}}
+		end),
+    gcm:push(test, [<<"Token">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
+    receive
+        Any -> [
+                {"Status is 401", ?_assertMatch({ok, {{_, 401, _}, [], []}}, Any)},
+                {"Validate httpc", ?_assert(meck:validate(httpc))}
+               ]
+    end.
+
+send_gcm_down(Pid) ->
+    meck:expect(httpc, request,
+		fun(post, {_BaseURL, _WrongAuthHeader, "application/json", _JSON}, [], []) ->
+			Pid ! {ok, {{"", 503, ""}, [], []}}
+		end),
+    gcm:push(test, [<<"Token">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
+    receive
+        Any -> [
+                {"Status is 503", ?_assertMatch({ok, {{_, 503, _}, [], []}}, Any)},
+                {"Validate httpc", ?_assert(meck:validate(httpc))}
+               ]
+    end.
