@@ -67,6 +67,12 @@ You can send this message using this sentence:
 
     8> gcm:push(RegisteredName, RegIds, [{<<"data">>, [
     8>     {<<"message">>, <<"a message">>}
+    8> ]}, {<<"time_to_live">>,3600}, {<<"collapse_key">>,<<"your_update">>}]).
+
+or simply:
+
+    8> gcm:push(RegisteredName, RegIds, [{<<"data">>, [
+    8>     {<<"message">>, <<"a message">>}
     8> ]}]).
 
 `gcm-erlang` will push the message for you to `Google Cloud Messaging` servers and will parse the JSON provided as result.
