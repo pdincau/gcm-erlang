@@ -11,13 +11,14 @@
 -behaviour(gen_server).
 
 %% API
--export([start/2, start/3, stop/1, start_link/2, start_link/3, push/3]).
+-export([start/2, start/3, stop/1, start_link/2, start_link/3]).
+-export([push/3, sync_push/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
--define(SERVER, ?MODULE). 
+-define(SERVER, ?MODULE).
 
 -define(BASEURL, "https://android.googleapis.com/gcm/send").
 
@@ -50,6 +51,7 @@ stop(Name) ->
 
 push(Name, RegIds, Message) ->
     gen_server:cast(Name, {send, RegIds, Message}).
+
 sync_push(Name, RegIds, Message) ->
     gen_server:call(Name, {send, RegIds, Message}).
 
@@ -87,8 +89,10 @@ init([Key, ErrorFun]) ->
 %%--------------------------------------------------------------------
 handle_call(stop, _From, State) ->
     {stop, normal, stopped, State};
+
 handle_call({send, RegIds, Message}, _From, #state{key=Key, error_fun=ErrorFun} = State) ->
     {reply, do_push(RegIds, Message, Key, ErrorFun), State};
+
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -109,49 +113,6 @@ handle_cast({send, RegIds, Message}, #state{key=Key, error_fun=ErrorFun} = State
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
-
-
-do_push(RegIds, Message, Key, ErrorFun) ->
-    lager:info("Message=~p; RegIds=~p~n", [Message, RegIds]),
-    GCMRequest = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
-    ApiKey = string:concat("key=", Key),
-
-    try httpc:request(post, {?BASEURL, [{"Authorization", ApiKey}], "application/json", GCMRequest}, [], []) of
-        {ok, {{_, 200, _}, Headers, GCMResponse}} ->
-            Json = jsx:decode(response_to_binary(GCMResponse)),
-            {_Multicast, _Success, Failure, Canonical, Results} = get_response_fields(Json),
-            case to_be_parsed(Failure, Canonical) of
-                true ->
-                    parse_results(Results, RegIds, ErrorFun);
-                false ->
-                    ok
-            end;
-        {error, Reason} ->
-            %% Some general error during the request.
-            lager:error("error in request: ~p~n", [Reason]),
-            {error, Reason};
-        {ok, {{_, 400, _}, _, _}} ->
-            %% Some error in the Json.
-            {error, json_error};
-        {ok, {{_, 401, _}, _, _}} ->
-            %% Some error in the authorization.
-            lager:error("authorization error!", []),
-            {error, auth_error};
-        {ok, {{_, Code, _}, _, _}} when Code >= 500 andalso Code =< 599 ->
-            %% TODO: retry with exponential back-off
-            {error, retry};
-        {ok, {{_StatusLine, _, _}, _, _Body}} ->
-            %% Request handled but some error like timeout happened.
-            {error, timeout};
-        OtherError ->
-            %% Some other nasty error.
-            lager:error("other error: ~p~n", [OtherError]),
-            {noreply, unknown}
-    catch
-        Exception ->
-            lager:error("exception ~p in call to URL: ~p~n", [Exception, ?BASEURL]),
-            {error, Exception}
-    end.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -194,6 +155,48 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+do_push(RegIds, Message, Key, ErrorFun) ->
+    lager:info("Message=~p; RegIds=~p~n", [Message, RegIds]),
+    GCMRequest = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
+    ApiKey = string:concat("key=", Key),
+
+    try httpc:request(post, {?BASEURL, [{"Authorization", ApiKey}], "application/json", GCMRequest}, [], []) of
+        {ok, {{_, 200, _}, Headers, GCMResponse}} ->
+            Json = jsx:decode(response_to_binary(GCMResponse)),
+            {_Multicast, _Success, Failure, Canonical, Results} = get_response_fields(Json),
+            case to_be_parsed(Failure, Canonical) of
+                true ->
+                    parse_results(Results, RegIds, ErrorFun);
+                false ->
+                    ok
+            end;
+        {error, Reason} ->
+            %% Some general error during the request.
+            lager:error("error in request: ~p~n", [Reason]),
+            {error, Reason};
+        {ok, {{_, 400, _}, _, _}} ->
+            %% Some error in the Json.
+            {error, json_error};
+        {ok, {{_, 401, _}, _, _}} ->
+            %% Some error in the authorization.
+            lager:error("authorization error!", []),
+            {error, auth_error};
+        {ok, {{_, Code, _}, _, _}} when Code >= 500 andalso Code =< 599 ->
+            %% TODO: retry with exponential back-off
+            {error, retry};
+        {ok, {{_StatusLine, _, _}, _, _Body}} ->
+            %% Request handled but some error like timeout happened.
+            {error, timeout};
+        OtherError ->
+            %% Some other nasty error.
+            lager:error("other error: ~p~n", [OtherError]),
+            {noreply, unknown}
+    catch
+        Exception ->
+            lager:error("exception ~p in call to URL: ~p~n", [Exception, ?BASEURL]),
+            {error, Exception}
+    end.
+
 response_to_binary(Json) when is_binary(Json) ->
     Json;
 
@@ -221,7 +224,7 @@ parse_results([Result|Results], [RegId|RegIds], ErrorFun) ->
         {Error,undefined,undefined} when Error =/= undefined ->
             ErrorFun(Error, RegId),
             parse_results(Results, RegIds, ErrorFun);
-        {undefined,MessageId,undefined} when MessageId =/= undefined -> 
+        {undefined,MessageId,undefined} when MessageId =/= undefined ->
             lager:info("Message sent.~n", []),
             parse_results(Results, RegIds, ErrorFun);
         {undefined,MessageId,NewRegId} when MessageId =/= undefined andalso NewRegId =/= undefined ->
@@ -268,5 +271,5 @@ handle_error(UnexpectedError, RegId) ->
 %%	<<"MessageTooBig">>					%%
 %%      <<"InvalidDataKey">>					%%
 %%	<<"InvalidTtl">>					%%
-%%								%%	
+%%								%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
