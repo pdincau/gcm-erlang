@@ -216,6 +216,7 @@ get_response_fields(Json) ->
     }.
 
 to_be_parsed(0, 0) -> false;
+
 to_be_parsed(_Failure, _Canonical) -> true.
 
 parse_results([Result|Results], [RegId|RegIds], ErrorFun) ->
@@ -234,6 +235,7 @@ parse_results([Result|Results], [RegId|RegIds], ErrorFun) ->
             ErrorFun(<<"NewRegistrationId">>, {RegId, NewRegId}),
             parse_results(Results, RegIds, ErrorFun)
     end;
+
 parse_results([], [], _ErrorFun) ->
     ok.
 
