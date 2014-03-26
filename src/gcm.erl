@@ -221,13 +221,13 @@ parse_results([Result|Results], [RegId|RegIds], ErrorFun) ->
         proplists:get_value(<<"message_id">>, Result),
         proplists:get_value(<<"registration_id">>, Result)
     } of
-        {Error,undefined,undefined} when Error =/= undefined ->
+        {Error, undefined, undefined} when Error =/= undefined ->
             ErrorFun(Error, RegId),
             parse_results(Results, RegIds, ErrorFun);
-        {undefined,MessageId,undefined} when MessageId =/= undefined ->
+        {undefined, MessageId, undefined} when MessageId =/= undefined ->
             lager:info("Message sent.~n", []),
             parse_results(Results, RegIds, ErrorFun);
-        {undefined,MessageId,NewRegId} when MessageId =/= undefined andalso NewRegId =/= undefined ->
+        {undefined, MessageId, NewRegId} when MessageId =/= undefined andalso NewRegId =/= undefined ->
             ErrorFun(<<"NewRegistrationId">>, {RegId, NewRegId}),
             parse_results(Results, RegIds, ErrorFun)
     end;
