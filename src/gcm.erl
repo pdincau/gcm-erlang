@@ -163,13 +163,7 @@ do_push(RegIds, Message, Key, ErrorFun) ->
     try httpc:request(post, {?BASEURL, [{"Authorization", ApiKey}], "application/json", GCMRequest}, [], []) of
         {ok, {{_, 200, _}, Headers, GCMResponse}} ->
             Json = jsx:decode(response_to_binary(GCMResponse)),
-            {_Multicast, _Success, Failure, Canonical, Results} = get_response_fields(Json),
-            case to_be_parsed(Failure, Canonical) of
-                true ->
-                    parse_results(Results, RegIds, ErrorFun);
-                false ->
-                    ok
-            end;
+            handle_push_result(Json, RegIds, ErrorFun);
         {error, Reason} ->
             %% Some general error during the request.
             lager:error("error in request: ~p~n", [Reason]),
@@ -195,6 +189,15 @@ do_push(RegIds, Message, Key, ErrorFun) ->
         Exception ->
             lager:error("exception ~p in call to URL: ~p~n", [Exception, ?BASEURL]),
             {error, Exception}
+    end.
+
+handle_push_result(Json, RegIds, ErrorFun) ->
+    {_Multicast, _Success, Failure, Canonical, Results} = get_response_fields(Json),
+    case to_be_parsed(Failure, Canonical) of
+        true ->
+            parse_results(Results, RegIds, ErrorFun);
+        false ->
+            ok
     end.
 
 response_to_binary(Json) when is_binary(Json) ->
