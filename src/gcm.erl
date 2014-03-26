@@ -50,6 +50,8 @@ stop(Name) ->
 
 push(Name, RegIds, Message) ->
     gen_server:cast(Name, {send, RegIds, Message}).
+sync_push(Name, RegIds, Message) ->
+    gen_server:call(Name, {send, RegIds, Message}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -85,7 +87,8 @@ init([Key, ErrorFun]) ->
 %%--------------------------------------------------------------------
 handle_call(stop, _From, State) ->
     {stop, normal, stopped, State};
-
+handle_call({send, RegIds, Message}, _From, #state{key=Key, error_fun=ErrorFun} = State) ->
+    {reply, do_push(RegIds, Message, Key, ErrorFun), State};
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
@@ -101,6 +104,14 @@ handle_call(_Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast({send, RegIds, Message}, #state{key=Key, error_fun=ErrorFun} = State) ->
+    do_push(RegIds, Message, Key, ErrorFun),
+    {noreply, State};
+
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+
+do_push(RegIds, Message, Key, ErrorFun) ->
     lager:info("Message=~p; RegIds=~p~n", [Message, RegIds]),
     GCMRequest = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
     ApiKey = string:concat("key=", Key),
@@ -111,40 +122,36 @@ handle_cast({send, RegIds, Message}, #state{key=Key, error_fun=ErrorFun} = State
             {_Multicast, _Success, Failure, Canonical, Results} = get_response_fields(Json),
             case to_be_parsed(Failure, Canonical) of
                 true ->
-                    parse_results(Results, RegIds, ErrorFun),
-                    {noreply, State};
+                    parse_results(Results, RegIds, ErrorFun);
                 false ->
-                    {noreply, State}
+                    ok
             end;
         {error, Reason} ->
             %% Some general error during the request.
             lager:error("error in request: ~p~n", [Reason]),
-            {noreply, State};
+            {error, Reason};
         {ok, {{_, 400, _}, _, _}} ->
             %% Some error in the Json.
-            {noreply, State};
+            {error, json_error};
         {ok, {{_, 401, _}, _, _}} ->
             %% Some error in the authorization.
             lager:error("authorization error!", []),
-            {noreply, State};
+            {error, auth_error};
         {ok, {{_, Code, _}, _, _}} when Code >= 500 andalso Code =< 599 ->
             %% TODO: retry with exponential back-off
-            {noreply, State};
+            {error, retry};
         {ok, {{_StatusLine, _, _}, _, _Body}} ->
             %% Request handled but some error like timeout happened.
-            {noreply, State};
+            {error, timeout};
         OtherError ->
             %% Some other nasty error.
             lager:error("other error: ~p~n", [OtherError]),
-            {noreply, State}
+            {noreply, unknown}
     catch
         Exception ->
             lager:error("exception ~p in call to URL: ~p~n", [Exception, ?BASEURL]),
-            {noreply, State}
-    end;
-
-handle_cast(_Msg, State) ->
-    {noreply, State}.
+            {error, Exception}
+    end.
 
 %%--------------------------------------------------------------------
 %% @private
