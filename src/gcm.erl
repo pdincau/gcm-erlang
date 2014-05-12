@@ -12,7 +12,7 @@
 
 %% API
 -export([start/2, start/3, stop/1, start_link/2, start_link/3]).
--export([push/3, sync_push/3]).
+-export([push/3, sync_push/3, update_error_fun/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -55,6 +55,8 @@ push(Name, RegIds, Message) ->
 sync_push(Name, RegIds, Message) ->
     gen_server:call(Name, {send, RegIds, Message}).
 
+update_error_fun(Name, Fun) ->
+    gen_server:cast(Name, {error_fun, Fun}).
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -110,6 +112,10 @@ handle_call(_Request, _From, State) ->
 handle_cast({send, RegIds, Message}, #state{key=Key, error_fun=ErrorFun} = State) ->
     do_push(RegIds, Message, Key, ErrorFun),
     {noreply, State};
+
+handle_cast({error_fun, Fun}, State) ->
+    NewState = State#state{error_fun=Fun},
+    {noreply, NewState};
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
