@@ -11,7 +11,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start/2, start/3, stop/1, start_link/2, start_link/3]).
+-export([start/2, start/3, start/4, stop/1, start_link/2, start_link/3, start_link/4]).
 -export([push/3, sync_push/3, update_error_fun/2]).
 
 %% gen_server callbacks
@@ -22,7 +22,7 @@
 
 -define(BASEURL, "https://android.googleapis.com/gcm/send").
 
--record(state, {key, retry_after, error_fun}).
+-record(state, {key, retry_after, error_fun, url}).
 
 %%%===================================================================
 %%% API
@@ -31,7 +31,10 @@ start(Name, Key) ->
     start(Name, Key, fun handle_error/2).
 
 start(Name, Key, ErrorFun) ->
-    gcm_sup:start_child(Name, Key, ErrorFun).
+    start(Name, Key, ErrorFun, ?BASEURL).
+
+start(Name, Key, ErrorFun, Url) ->
+    gcm_sup:start_child(Name, Key, ErrorFun, Url).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -44,7 +47,10 @@ start_link(Name, Key) ->
     start_link(Name, Key, fun handle_error/2).
 
 start_link(Name, Key, ErrorFun) ->
-    gen_server:start_link({local, Name}, ?MODULE, [Key, ErrorFun], []).
+    start_link(Name, Key, ErrorFun, ?BASEURL).
+
+start_link(Name, Key, ErrorFun, Url) ->
+    gen_server:start_link({local, Name}, ?MODULE, [Key, ErrorFun, Url], []).
 
 stop(Name) ->
     gen_server:call(Name, stop).
@@ -72,8 +78,8 @@ update_error_fun(Name, Fun) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Key, ErrorFun]) ->
-    {ok, #state{key=Key, retry_after=0, error_fun=ErrorFun}}.
+init([Key, ErrorFun, Url]) ->
+    {ok, #state{key=Key, retry_after=0, error_fun=ErrorFun, url=Url}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -92,8 +98,8 @@ init([Key, ErrorFun]) ->
 handle_call(stop, _From, State) ->
     {stop, normal, stopped, State};
 
-handle_call({send, RegIds, Message}, _From, #state{key=Key, error_fun=ErrorFun} = State) ->
-    {reply, do_push(RegIds, Message, Key, ErrorFun), State};
+handle_call({send, RegIds, Message}, _From, #state{key=Key, error_fun=ErrorFun, url=Url} = State) ->
+    {reply, do_push(RegIds, Message, Key, ErrorFun, Url), State};
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -109,8 +115,8 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({send, RegIds, Message}, #state{key=Key, error_fun=ErrorFun} = State) ->
-    do_push(RegIds, Message, Key, ErrorFun),
+handle_cast({send, RegIds, Message}, #state{key=Key, error_fun=ErrorFun, url=Url} = State) ->
+    do_push(RegIds, Message, Key, ErrorFun, Url),
     {noreply, State};
 
 handle_cast({error_fun, Fun}, State) ->
@@ -161,12 +167,11 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-do_push(RegIds, Message, Key, ErrorFun) ->
+do_push(RegIds, Message, Key, ErrorFun, Url) ->
     lager:info("Message=~p; RegIds=~p~n", [Message, RegIds]),
     GCMRequest = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
     ApiKey = string:concat("key=", Key),
-
-    try httpc:request(post, {?BASEURL, [{"Authorization", ApiKey}], "application/json", GCMRequest}, [], []) of
+    try httpc:request(post, {Url, [{"Authorization", ApiKey}], "application/json", GCMRequest}, [], []) of
         {ok, {{_, 200, _}, Headers, GCMResponse}} ->
             Json = jsx:decode(response_to_binary(GCMResponse)),
             handle_push_result(Json, RegIds, ErrorFun);
@@ -193,7 +198,7 @@ do_push(RegIds, Message, Key, ErrorFun) ->
             {noreply, unknown}
     catch
         Exception ->
-            lager:error("exception ~p in call to URL: ~p~n", [Exception, ?BASEURL]),
+            lager:error("exception ~p in call to URL: ~p~n", [Exception, Url]),
             {error, Exception}
     end.
 
