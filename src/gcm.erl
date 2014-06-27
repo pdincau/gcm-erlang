@@ -79,7 +79,7 @@ update_error_fun(Name, Fun) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Key, ErrorFun, Url]) ->
-    {ok, #state{key=Key, retry_after=0, error_fun=ErrorFun}}.
+    {ok, #state{key=Key, retry_after=0, error_fun=ErrorFun, url=Url}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -171,7 +171,6 @@ do_push(RegIds, Message, Key, ErrorFun, Url) ->
     lager:info("Message=~p; RegIds=~p~n", [Message, RegIds]),
     GCMRequest = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
     ApiKey = string:concat("key=", Key),
-
     try httpc:request(post, {Url, [{"Authorization", ApiKey}], "application/json", GCMRequest}, [], []) of
         {ok, {{_, 200, _}, Headers, GCMResponse}} ->
             Json = jsx:decode(response_to_binary(GCMResponse)),
