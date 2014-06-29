@@ -25,6 +25,9 @@ gcm_message_test_() ->
      {"It gets a 401 when message has wrong auth", ?setup(fun send_wrong_auth/1)},
      {"It gets a 503 when GCM servers are down", ?setup(fun send_gcm_down/1)}].
 
+gcm_sync_test_() ->
+    [{"Doing a sync_push returns the result information", ?setup(fun receive_results_from_sync_push/1)}].
+
 send_valid_message(Pid) ->
     meck:expect(httpc, request,
 		fun(post, {_BaseURL, _AuthHeader, "application/json", _JSON}, [], []) ->
@@ -77,3 +80,21 @@ send_gcm_down(Pid) ->
                 {"Validate httpc", ?_assert(meck:validate(httpc))}
                ]
     end.
+
+receive_results_from_sync_push(_) ->
+    meck:expect(httpc, request,
+        fun(post, {_BaseURL, _AuthHeader, "application/json", _JSON}, [], []) ->
+            Reply = <<"{\"multicast_id\":\"whatever\",\"success\":1,\"results\":
+                [{\"message_id\":\"1:0408\"},
+                 {\"error\": \"InvalidRegistration\"},
+                 {\"message_id\": \"1:2342\", \"registration_id\": \"NewToken\"}]}">>,
+            {ok, {{"", 200, ""}, [], Reply}}
+        end),
+    Result = gcm:sync_push(test, [<<"Token0">>, <<"Token1">>, <<"Token2">>],
+        [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
+    ExpectedResult = [ok, {<<"InvalidRegistration">>, <<"Token1">>},
+        {<<"NewRegistrationId">>, {<<"Token2">>, <<"NewToken">>}}],
+    [
+        {"Results are passed to the caller", ?_assertMatch(ExpectedResult, Result)},
+        {"Validate httpc", ?_assert(meck:validate(httpc))}
+    ].
