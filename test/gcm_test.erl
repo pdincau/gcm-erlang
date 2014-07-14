@@ -5,27 +5,14 @@
 
 -define(setup(F), {setup, fun start/0, fun stop/1, F}).
 
-init_and_stop_test() ->
-    ?assertMatch({ok, _}, gcm:start_link(test, "APIKEY")),
-    ?assertEqual(stopped, gcm:stop(test)),
-    ?assertEqual(undefined, whereis(test)).
-
 start() ->
-    {ok, Pid} = gcm:start_link(test, "APIKEY"),
+    {ok, _} = gcm:start_link(test, "APIKEY"),
     meck:new(httpc),
-    Pid.
+    _Pid = self().
 
-stop(Pid) ->
+stop(_Pid) ->
     meck:unload(httpc),
-    gcm:stop(test),
-    wait_for_exit(Pid).
-
-wait_for_exit(Pid) ->
-    MRef = erlang:monitor(process, Pid),
-    receive
-        {'DOWN', MRef, _, _, _} ->
-            ok
-    end.
+    gcm:stop(test).
 
 gcm_message_test_() ->
     [{"It gets a 200 when message is correct", ?setup(fun send_valid_message/1)},
