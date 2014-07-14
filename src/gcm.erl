@@ -167,7 +167,7 @@ do_push(RegIds, Message, Key, ErrorFun) ->
     ApiKey = string:concat("key=", Key),
 
     try httpc:request(post, {?BASEURL, [{"Authorization", ApiKey}], "application/json", GCMRequest}, [], []) of
-        {ok, {{_, 200, _}, Headers, GCMResponse}} ->
+        {ok, {{_, 200, _}, _Headers, GCMResponse}} ->
             Json = jsx:decode(response_to_binary(GCMResponse)),
             handle_push_result(Json, RegIds, ErrorFun);
         {error, Reason} ->
