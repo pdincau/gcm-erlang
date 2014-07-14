@@ -92,8 +92,8 @@ init([Key, ErrorFun]) ->
 handle_call(stop, _From, State) ->
     {stop, normal, stopped, State};
 
-handle_call({send, RegIds, Message}, _From, #state{key=Key, error_fun=ErrorFun} = State) ->
-    {reply, do_push(RegIds, Message, Key, ErrorFun), State};
+handle_call({send, RegIds, Message}, _From, #state{key=Key} = State) ->
+    {reply, do_push(RegIds, Message, Key, undefined), State};
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
@@ -197,11 +197,18 @@ do_push(RegIds, Message, Key, ErrorFun) ->
             {error, Exception}
     end.
 
+
+handle_push_result(Json, RegIds, undefined) ->
+    {_Multicast, _Success, _Failure, _Canonical, Results} = get_response_fields(Json),
+    lists:map(fun({Result, RegId}) -> parse_results(Result, RegId, fun(E, I) -> {E, I} end) end,
+        lists:zip(Results, RegIds));
+
 handle_push_result(Json, RegIds, ErrorFun) ->
     {_Multicast, _Success, Failure, Canonical, Results} = get_response_fields(Json),
     case to_be_parsed(Failure, Canonical) of
         true ->
-            parse_results(Results, RegIds, ErrorFun);
+            lists:foreach(fun({Result, RegId}) -> parse_results(Result, RegId, ErrorFun) end,
+                lists:zip(Results, RegIds));
         false ->
             ok
     end.
@@ -225,25 +232,19 @@ to_be_parsed(0, 0) -> false;
 
 to_be_parsed(_Failure, _Canonical) -> true.
 
-parse_results([Result|Results], [RegId|RegIds], ErrorFun) ->
+parse_results(Result, RegId, ErrorFun) ->
     case {
         proplists:get_value(<<"error">>, Result),
         proplists:get_value(<<"message_id">>, Result),
         proplists:get_value(<<"registration_id">>, Result)
     } of
         {Error, undefined, undefined} when Error =/= undefined ->
-            ErrorFun(Error, RegId),
-            parse_results(Results, RegIds, ErrorFun);
+            ErrorFun(Error, RegId);
         {undefined, MessageId, undefined} when MessageId =/= undefined ->
-            lager:info("Message sent.~n", []),
-            parse_results(Results, RegIds, ErrorFun);
+            ok;
         {undefined, MessageId, NewRegId} when MessageId =/= undefined andalso NewRegId =/= undefined ->
-            ErrorFun(<<"NewRegistrationId">>, {RegId, NewRegId}),
-            parse_results(Results, RegIds, ErrorFun)
-    end;
-
-parse_results([], [], _ErrorFun) ->
-    ok.
+            ErrorFun(<<"NewRegistrationId">>, {RegId, NewRegId})
+    end.
 
 handle_error(<<"NewRegistrationId">>, {RegId, NewRegId}) ->
     lager:info("Message sent. Update id ~p with new id ~p.~n", [RegId, NewRegId]),
