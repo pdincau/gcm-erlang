@@ -1,6 +1,7 @@
 language: erlang
 script: 
      - "./rebar compile && ./rebar skip_deps=true eunit"
+     - make dialyzer
 notifications:
   email: paolo.dincau@gmail.com
 otp_release:
