@@ -21,7 +21,6 @@
 start() ->
     application:start(inets),
     application:start(jsx),
-    application:start(lager),
     application:start(gcm).
 
 start(_StartType, _StartArgs) ->
