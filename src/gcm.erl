@@ -184,7 +184,7 @@ do_push(RegIds, Message, Key, ErrorFun) ->
         {ok, {{_StatusLine, _, _}, _, _Body}} ->
             %% Request handled but some error like timeout happened.
             {error, timeout};
-        OtherError ->
+        _OtherError ->
             %% Some other nasty error.
             {noreply, unknown}
     catch
@@ -241,26 +241,26 @@ parse_results(Result, RegId, ErrorFun) ->
             ErrorFun(<<"NewRegistrationId">>, {RegId, NewRegId})
     end.
 
-handle_error(<<"NewRegistrationId">>, {RegId, NewRegId}) ->
+handle_error(<<"NewRegistrationId">>, {_RegId, _NewRegId}) ->
     ok;
 
-handle_error(<<"Unavailable">>, RegId) ->
+handle_error(<<"Unavailable">>, _RegId) ->
     %% The server couldn't process the request in time. Retry later with exponential backoff.
     ok;
 
-handle_error(<<"InternalServerError">>, RegId) ->
+handle_error(<<"InternalServerError">>, _RegId) ->
     % GCM had an internal server error. Retry later with exponential backoff.
     ok;
 
-handle_error(<<"InvalidRegistration">>, RegId) ->
+handle_error(<<"InvalidRegistration">>, _RegId) ->
     %% Invalid registration id in database.
     ok;
 
-handle_error(<<"NotRegistered">>, RegId) ->
+handle_error(<<"NotRegistered">>, _RegId) ->
     %% Application removed. Delete device from database.
     ok;
 
-handle_error(UnexpectedError, RegId) ->
+handle_error(_UnexpectedError, _RegId) ->
     %% There was an unexpected error that couldn't be identified.
     ok.
 
