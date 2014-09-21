@@ -10,5 +10,6 @@
         lager
     ]},
     {mod, {gcm_app, []}},
+    {modules, [gcm]},
     {env, []}
 ]}.
