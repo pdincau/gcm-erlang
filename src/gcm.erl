@@ -162,7 +162,6 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 do_push(RegIds, Message, Key, ErrorFun) ->
-    lager:info("Message=~p; RegIds=~p~n", [Message, RegIds]),
     GCMRequest = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
     ApiKey = string:concat("key=", Key),
 
@@ -172,14 +171,12 @@ do_push(RegIds, Message, Key, ErrorFun) ->
             handle_push_result(Json, RegIds, ErrorFun);
         {error, Reason} ->
             %% Some general error during the request.
-            lager:error("error in request: ~p~n", [Reason]),
             {error, Reason};
         {ok, {{_, 400, _}, _, _}} ->
             %% Some error in the Json.
             {error, json_error};
         {ok, {{_, 401, _}, _, _}} ->
             %% Some error in the authorization.
-            lager:error("authorization error!", []),
             {error, auth_error};
         {ok, {{_, Code, _}, _, _}} when Code >= 500 andalso Code =< 599 ->
             %% TODO: retry with exponential back-off
@@ -187,13 +184,11 @@ do_push(RegIds, Message, Key, ErrorFun) ->
         {ok, {{_StatusLine, _, _}, _, _Body}} ->
             %% Request handled but some error like timeout happened.
             {error, timeout};
-        OtherError ->
+        _OtherError ->
             %% Some other nasty error.
-            lager:error("other error: ~p~n", [OtherError]),
             {noreply, unknown}
     catch
         Exception ->
-            lager:error("exception ~p in call to URL: ~p~n", [Exception, ?BASEURL]),
             {error, Exception}
     end.
 
@@ -246,33 +241,27 @@ parse_results(Result, RegId, ErrorFun) ->
             ErrorFun(<<"NewRegistrationId">>, {RegId, NewRegId})
     end.
 
-handle_error(<<"NewRegistrationId">>, {RegId, NewRegId}) ->
-    lager:info("Message sent. Update id ~p with new id ~p.~n", [RegId, NewRegId]),
+handle_error(<<"NewRegistrationId">>, {_RegId, _NewRegId}) ->
     ok;
 
-handle_error(<<"Unavailable">>, RegId) ->
+handle_error(<<"Unavailable">>, _RegId) ->
     %% The server couldn't process the request in time. Retry later with exponential backoff.
-    lager:error("unavailable ~p~n", [RegId]),
     ok;
 
-handle_error(<<"InternalServerError">>, RegId) ->
+handle_error(<<"InternalServerError">>, _RegId) ->
     % GCM had an internal server error. Retry later with exponential backoff.
-    lager:error("internal server error ~p~n", [RegId]),
     ok;
 
-handle_error(<<"InvalidRegistration">>, RegId) ->
+handle_error(<<"InvalidRegistration">>, _RegId) ->
     %% Invalid registration id in database.
-    lager:error("invalid registration ~p~n", [RegId]),
     ok;
 
-handle_error(<<"NotRegistered">>, RegId) ->
+handle_error(<<"NotRegistered">>, _RegId) ->
     %% Application removed. Delete device from database.
-    lager:error("not registered ~p~n", [RegId]),
     ok;
 
-handle_error(UnexpectedError, RegId) ->
+handle_error(_UnexpectedError, _RegId) ->
     %% There was an unexpected error that couldn't be identified.
-    lager:error("unexpected error ~p in ~p~n", [UnexpectedError, RegId]),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
