@@ -17,6 +17,9 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
+-ifdef(TEST).
+-compile(export_all).
+-endif.
 
 -define(SERVER, ?MODULE).
 
@@ -181,7 +184,8 @@ do_push(RegIds, Message, Key, ErrorFun) ->
             %% Some error in the authorization.
             error_logger:error_msg("authorization error!", []),
             {error, auth_error};
-        {ok, {{_, Code, _}, _, _}} when Code >= 500 andalso Code =< 599 ->
+        {ok, {{_, Code, _}, Headers, _}} when Code >= 500 andalso Code =< 599 ->
+	    do_backoff(Headers, RegIds, Message, Key, ErrorFun) ,
             %% TODO: retry with exponential back-off
             {error, retry};
         {ok, {{_StatusLine, _, _}, _, _Body}} ->
@@ -241,7 +245,7 @@ parse_results(Result, RegId, ErrorFun) ->
         {Error, undefined, undefined} when Error =/= undefined ->
             ErrorFun(Error, RegId);
         {undefined, MessageId, undefined} when MessageId =/= undefined ->
-            parse_results(Results, RegIds, ErrorFun);
+	    ok;
         {undefined, MessageId, NewRegId} when MessageId =/= undefined andalso NewRegId =/= undefined ->
             ErrorFun(<<"NewRegistrationId">>, {RegId, NewRegId})
     end.
@@ -285,3 +289,30 @@ handle_error(UnexpectedError, RegId) ->
 %%	<<"InvalidTtl">>					%%
 %%								%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%% If google sends us a "retry after" header, we parse it and retry at the correct time
+%% if not we do nothing
+get_retry_time(Headers) ->
+    case proplists:get_value("retry-after", Headers) of
+	undefined ->
+	    no_retry;
+	RetryTime ->
+	    case string:to_integer(RetryTime) of
+		{Time, _} when is_integer(Time) ->
+		    {ok, Time};
+		{error,no_integer} ->
+		    Date = qdate:to_unixtime(RetryTime),
+		    {ok, Date - qdate:unixtime()}
+	    end
+    end.
+
+
+do_backoff(Headers, RegIds, Message, Key, ErrorFun) ->
+    RetryTime = get_retry_time(Headers),
+    case RetryTime of
+	{ok, Time} ->
+	    timer:apply_after(Time * 1000, ?MODULE, do_push,[RegIds, Message, Key, ErrorFun]);
+	no_retry ->
+	    ok
+    end.
