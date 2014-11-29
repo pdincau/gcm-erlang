@@ -1,9 +1,10 @@
 language: erlang
-script: 
+script:
      - "./rebar compile && ./rebar skip_deps=true eunit"
 notifications:
   email: paolo.dincau@gmail.com
 otp_release:
+     - 17.1
      - 17.0
      - R16B03-1
      - R16B02
