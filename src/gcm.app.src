@@ -6,8 +6,7 @@
         kernel,
         stdlib,
         inets,
-        jsx,
-        lager
+        jsx
     ]},
     {mod, {gcm_app, []}},
     {env, []}

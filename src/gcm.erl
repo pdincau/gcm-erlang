@@ -17,6 +17,9 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
+-ifdef(TEST).
+-compile(export_all).
+-endif.
 
 -define(SERVER, ?MODULE).
 
@@ -162,7 +165,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 do_push(RegIds, Message, Key, ErrorFun) ->
-    lager:info("Message=~p; RegIds=~p~n", [Message, RegIds]),
+    error_logger:info_msg("Message=~p; RegIds=~p~n", [Message, RegIds]),
     GCMRequest = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
     ApiKey = string:concat("key=", Key),
 
@@ -172,16 +175,17 @@ do_push(RegIds, Message, Key, ErrorFun) ->
             handle_push_result(Json, RegIds, ErrorFun);
         {error, Reason} ->
             %% Some general error during the request.
-            lager:error("error in request: ~p~n", [Reason]),
+            error_logger:error_msg("error in request: ~p~n", [Reason]),
             {error, Reason};
         {ok, {{_, 400, _}, _, _}} ->
             %% Some error in the Json.
             {error, json_error};
         {ok, {{_, 401, _}, _, _}} ->
             %% Some error in the authorization.
-            lager:error("authorization error!", []),
+            error_logger:error_msg("authorization error!", []),
             {error, auth_error};
-        {ok, {{_, Code, _}, _, _}} when Code >= 500 andalso Code =< 599 ->
+        {ok, {{_, Code, _}, Headers, _}} when Code >= 500 andalso Code =< 599 ->
+	    do_backoff(Headers, RegIds, Message, Key, ErrorFun) ,
             %% TODO: retry with exponential back-off
             {error, retry};
         {ok, {{_StatusLine, _, _}, _, _Body}} ->
@@ -189,11 +193,11 @@ do_push(RegIds, Message, Key, ErrorFun) ->
             {error, timeout};
         OtherError ->
             %% Some other nasty error.
-            lager:error("other error: ~p~n", [OtherError]),
+            error_logger:error_msg("other error: ~p~n", [OtherError]),
             {noreply, unknown}
     catch
         Exception ->
-            lager:error("exception ~p in call to URL: ~p~n", [Exception, ?BASEURL]),
+            error_logger:error_msg("exception ~p in call to URL: ~p~n", [Exception, ?BASEURL]),
             {error, Exception}
     end.
 
@@ -241,38 +245,38 @@ parse_results(Result, RegId, ErrorFun) ->
         {Error, undefined, undefined} when Error =/= undefined ->
             ErrorFun(Error, RegId);
         {undefined, MessageId, undefined} when MessageId =/= undefined ->
-            ok;
+	    ok;
         {undefined, MessageId, NewRegId} when MessageId =/= undefined andalso NewRegId =/= undefined ->
             ErrorFun(<<"NewRegistrationId">>, {RegId, NewRegId})
     end.
 
 handle_error(<<"NewRegistrationId">>, {RegId, NewRegId}) ->
-    lager:info("Message sent. Update id ~p with new id ~p.~n", [RegId, NewRegId]),
+    error_logger:info_msg("Message sent. Update id ~p with new id ~p.~n", [RegId, NewRegId]),
     ok;
 
 handle_error(<<"Unavailable">>, RegId) ->
     %% The server couldn't process the request in time. Retry later with exponential backoff.
-    lager:error("unavailable ~p~n", [RegId]),
+    error_logger:error_msg("unavailable ~p~n", [RegId]),
     ok;
 
 handle_error(<<"InternalServerError">>, RegId) ->
     % GCM had an internal server error. Retry later with exponential backoff.
-    lager:error("internal server error ~p~n", [RegId]),
+    error_logger:error_msg("internal server error ~p~n", [RegId]),
     ok;
 
 handle_error(<<"InvalidRegistration">>, RegId) ->
     %% Invalid registration id in database.
-    lager:error("invalid registration ~p~n", [RegId]),
+    error_logger:error_msg("invalid registration ~p~n", [RegId]),
     ok;
 
 handle_error(<<"NotRegistered">>, RegId) ->
     %% Application removed. Delete device from database.
-    lager:error("not registered ~p~n", [RegId]),
+    error_logger:error_msg("not registered ~p~n", [RegId]),
     ok;
 
 handle_error(UnexpectedError, RegId) ->
     %% There was an unexpected error that couldn't be identified.
-    lager:error("unexpected error ~p in ~p~n", [UnexpectedError, RegId]),
+    error_logger:error_msg("unexpected error ~p in ~p~n", [UnexpectedError, RegId]),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -285,3 +289,30 @@ handle_error(UnexpectedError, RegId) ->
 %%	<<"InvalidTtl">>					%%
 %%								%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%% If google sends us a "retry after" header, we parse it and retry at the correct time
+%% if not we do nothing
+get_retry_time(Headers) ->
+    case proplists:get_value("retry-after", Headers) of
+	undefined ->
+	    no_retry;
+	RetryTime ->
+	    case string:to_integer(RetryTime) of
+		{Time, _} when is_integer(Time) ->
+		    {ok, Time};
+		{error,no_integer} ->
+		    Date = qdate:to_unixtime(RetryTime),
+		    {ok, Date - qdate:unixtime()}
+	    end
+    end.
+
+
+do_backoff(Headers, RegIds, Message, Key, ErrorFun) ->
+    RetryTime = get_retry_time(Headers),
+    case RetryTime of
+	{ok, Time} ->
+	    timer:apply_after(Time * 1000, ?MODULE, do_push,[RegIds, Message, Key, ErrorFun]);
+	no_retry ->
+	    ok
+    end.
