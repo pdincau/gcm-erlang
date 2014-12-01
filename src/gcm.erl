@@ -162,7 +162,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 do_push(RegIds, Message, Key, ErrorFun) ->
-    lager:info("Message=~p; RegIds=~p~n", [Message, RegIds]),
+    error_logger:info_msg("Message=~p; RegIds=~p~n", [Message, RegIds]),
     GCMRequest = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
     ApiKey = string:concat("key=", Key),
 
@@ -172,14 +172,14 @@ do_push(RegIds, Message, Key, ErrorFun) ->
             handle_push_result(Json, RegIds, ErrorFun);
         {error, Reason} ->
             %% Some general error during the request.
-            lager:error("error in request: ~p~n", [Reason]),
+	    error_logger:error_msg("error in request: ~p~n", [Reason]),
             {error, Reason};
         {ok, {{_, 400, _}, _, _}} ->
             %% Some error in the Json.
             {error, json_error};
         {ok, {{_, 401, _}, _, _}} ->
             %% Some error in the authorization.
-            lager:error("authorization error!", []),
+	    error_logger:error_msg("authorization error!", []),
             {error, auth_error};
         {ok, {{_, Code, _}, _, _}} when Code >= 500 andalso Code =< 599 ->
             %% TODO: retry with exponential back-off
@@ -189,11 +189,11 @@ do_push(RegIds, Message, Key, ErrorFun) ->
             {error, timeout};
         OtherError ->
             %% Some other nasty error.
-            lager:error("other error: ~p~n", [OtherError]),
+	    error_logger:error_msg("other error: ~p~n", [OtherError]),
             {noreply, unknown}
     catch
         Exception ->
-            lager:error("exception ~p in call to URL: ~p~n", [Exception, ?BASEURL]),
+	    error_logger:error_msg("exception ~p in call to URL: ~p~n", [Exception, ?BASEURL]),
             {error, Exception}
     end.
 
@@ -247,17 +247,17 @@ parse_results(Result, RegId, ErrorFun) ->
     end.
 
 handle_error(<<"NewRegistrationId">>, {RegId, NewRegId}) ->
-    lager:info("Message sent. Update id ~p with new id ~p.~n", [RegId, NewRegId]),
+    error_logger:info_msg("Message sent. Update id ~p with new id ~p.~n", [RegId, NewRegId]),
     ok;
 
 handle_error(<<"Unavailable">>, RegId) ->
     %% The server couldn't process the request in time. Retry later with exponential backoff.
-    lager:error("unavailable ~p~n", [RegId]),
+    error_logger:error_msg("unavailable ~p~n", [RegId]),
     ok;
 
 handle_error(<<"InternalServerError">>, RegId) ->
     % GCM had an internal server error. Retry later with exponential backoff.
-    lager:error("internal server error ~p~n", [RegId]),
+    error_logger:error_msg("internal server error ~p~n", [RegId]),
     ok;
 
 handle_error(<<"InvalidRegistration">>, RegId) ->
@@ -267,12 +267,12 @@ handle_error(<<"InvalidRegistration">>, RegId) ->
 
 handle_error(<<"NotRegistered">>, RegId) ->
     %% Application removed. Delete device from database.
-    lager:error("not registered ~p~n", [RegId]),
+    error_logger:error_msg("not registered ~p~n", [RegId]),
     ok;
 
 handle_error(UnexpectedError, RegId) ->
     %% There was an unexpected error that couldn't be identified.
-    lager:error("unexpected error ~p in ~p~n", [UnexpectedError, RegId]),
+    error_logger:error_msg("unexpected error ~p in ~p~n", [UnexpectedError, RegId]),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
