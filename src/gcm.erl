@@ -10,6 +10,10 @@
 
 -behaviour(gen_server).
 
+-ifdef(TEST).
+-compile(export_all).
+-endif.
+
 %% API
 -export([start/2, start/3, stop/1, start_link/2, start_link/3]).
 -export([push/3, sync_push/3, update_error_fun/2]).
@@ -181,8 +185,8 @@ do_push(RegIds, Message, Key, ErrorFun) ->
             %% Some error in the authorization.
 	    error_logger:error_msg("authorization error!", []),
             {error, auth_error};
-        {ok, {{_, Code, _}, _, _}} when Code >= 500 andalso Code =< 599 ->
-            %% TODO: retry with exponential back-off
+        {ok, {{_, Code, _}, Headers, _}} when Code >= 500 andalso Code =< 599 ->
+	    do_backoff(Headers, RegIds, Message, Key, ErrorFun) ,
             {error, retry};
         {ok, {{_StatusLine, _, _}, _, _Body}} ->
             %% Request handled but some error like timeout happened.
@@ -285,3 +289,26 @@ handle_error(UnexpectedError, RegId) ->
 %%	<<"InvalidTtl">>					%%
 %%								%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+get_retry_time(Headers) ->
+    case proplists:get_value("retry-after", Headers) of
+	undefined ->
+	    no_retry;
+	RetryTime ->
+	    case string:to_integer(RetryTime) of
+		{Time, _} when is_integer(Time) ->
+		    {ok, Time};
+		{error,no_integer} ->
+		    Date = qdate:to_unixtime(RetryTime),
+		    {ok, Date - qdate:unixtime()}
+	    end
+    end.
+
+
+do_backoff(Headers, RegIds, Message, Key, ErrorFun) ->
+    RetryTime = get_retry_time(Headers),
+    case RetryTime of
+	{ok, Time} ->
+	    timer:apply_after(Time * 1000, ?MODULE, do_push,[RegIds, Message, Key, ErrorFun]);
+	no_retry ->
+	    ok
+    end.

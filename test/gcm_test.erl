@@ -93,3 +93,21 @@ receive_results_from_sync_push(_) ->
         {"Results are passed to the caller", ?_assertMatch(ExpectedResult, Result)},
         {"Validate httpc", ?_assert(meck:validate(httpc))}
     ].
+
+get_retry_time_test() ->
+    application:start(qdate),
+    TargetDate = qdate:add_seconds(120, qdate:unixtime()),
+    TargetTime = qdate:to_string("Y-m-d h:ia",TargetDate),
+    Headers   = [{"retry-after", TargetTime}],
+    ?assertMatch({ok,I} when is_integer(I), gcm:get_retry_time(Headers)),
+    pass.
+
+get_retry_time_interval_test() ->
+    Headers   = [{"retry-after", "120"}],
+    ?assertEqual({ok,120}, gcm:get_retry_time(Headers)),
+    pass.
+
+get_retry_time_not_set_test() ->
+    Headers   = [],
+    ?assertEqual(no_retry, gcm:get_retry_time(Headers)),
+    pass.
