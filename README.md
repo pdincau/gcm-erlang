@@ -102,14 +102,6 @@ The first param is always a binary with the error and the second param can be a 
 
 Read this for futher details see: [Interpreting an error response](http://developer.android.com/google/gcm/gcm.html#response).
 
-### Possible future improvements:
-
-Some stuff I would like to add to `gcm-erlang`:
-
-1. resending of all the message not sent due to `GCM` timeout using exponential backoff
-
-In some cases when you receive a success/error message we should update/remove in our database the `Registration Ids`. I did not implement this because it depends on your needs. Problably I will store in different `ets tables` some information so that you will be able to inspect them and update your database. Feel free to edit in `gcm.erl` the functions `parse_results/2` and `handle_error/2` if you want to handle these issues in you own way.
-
 ### Note:
 
 Some of the concepts I used for building this Erlang application are based on this [`blog post`](http://tiliman.wordpress.com/2013/01/02/google-cloud-messaging-with-erlang/) and on this [`Erlang application for APN`](https://github.com/extend/ex_apns).
