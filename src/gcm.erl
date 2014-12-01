@@ -186,7 +186,8 @@ do_push(RegIds, Message, Key, ErrorFun) ->
 	    error_logger:error_msg("authorization error!", []),
             {error, auth_error};
         {ok, {{_, Code, _}, Headers, _}} when Code >= 500 andalso Code =< 599 ->
-	    do_backoff(Headers, RegIds, Message, Key, ErrorFun) ,
+	    RetryTime = headers_parser:retry_after_from(Headers),
+	    do_backoff(RetryTime, RegIds, Message, Key, ErrorFun) ,
             {error, retry};
         {ok, {{_StatusLine, _, _}, _, _Body}} ->
             %% Request handled but some error like timeout happened.
@@ -289,26 +290,11 @@ handle_error(UnexpectedError, RegId) ->
 %%	<<"InvalidTtl">>					%%
 %%								%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-get_retry_time(Headers) ->
-    case proplists:get_value("retry-after", Headers) of
-	undefined ->
-	    no_retry;
-	RetryTime ->
-	    case string:to_integer(RetryTime) of
-		{Time, _} when is_integer(Time) ->
-		    {ok, Time};
-		{error,no_integer} ->
-		    Date = qdate:to_unixtime(RetryTime),
-		    {ok, Date - qdate:unixtime()}
-	    end
-    end.
 
-
-do_backoff(Headers, RegIds, Message, Key, ErrorFun) ->
-    RetryTime = get_retry_time(Headers),
+do_backoff(RetryTime, RegIds, Message, Key, ErrorFun) ->
     case RetryTime of
 	{ok, Time} ->
-	    timer:apply_after(Time * 1000, ?MODULE, do_push,[RegIds, Message, Key, ErrorFun]);
+	    timer:apply_after(Time * 1000, ?MODULE, do_push, [RegIds, Message, Key, ErrorFun]);
 	no_retry ->
 	    ok
     end.
