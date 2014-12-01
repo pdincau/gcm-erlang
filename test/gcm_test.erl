@@ -6,6 +6,7 @@
 -define(setup(F), {setup, fun start/0, fun stop/1, F}).
 
 start() ->
+    error_logger:tty(false),
     {ok, _} = gcm:start_link(test, "APIKEY"),
     meck:new(httpc),
     _Pid = self().
