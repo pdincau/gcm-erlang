@@ -167,12 +167,12 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 do_push(RegIds, Message, Key, ErrorFun) ->
     error_logger:info_msg("Message=~p; RegIds=~p~n", [Message, RegIds]),
-    GCMRequest = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
+    Request = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
     ApiKey = string:concat("key=", Key),
 
-    try httpc:request(post, {?BASEURL, [{"Authorization", ApiKey}], "application/json", GCMRequest}, [], []) of
-        {ok, {{_, 200, _}, _Headers, GCMResponse}} ->
-            Json = jsx:decode(response_to_binary(GCMResponse)),
+    try httpc:request(post, {?BASEURL, [{"Authorization", ApiKey}], "application/json", Request}, [], []) of
+        {ok, {{_, 200, _}, _Headers, Body}} ->
+            Json = jsx:decode(response_to_binary(Body)),
             handle_push_result(Json, RegIds, ErrorFun);
         {error, Reason} ->
             %% Some general error during the request.
