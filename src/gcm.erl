@@ -165,7 +165,7 @@ do_push(RegIds, Message, Key, ErrorFun) ->
     error_logger:info_msg("Message=~p; RegIds=~p~n", [Message, RegIds]),
     Request = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
     ApiKey = string:concat("key=", Key),
-
+    
     try httpc:request(post, {?BASEURL, [{"Authorization", ApiKey}], "application/json", Request}, [], []) of
         {ok, {{_, 200, _}, _Headers, Body}} ->
             Json = jsx:decode(response_to_binary(Body)),
@@ -202,14 +202,14 @@ do_push(RegIds, Message, Key, ErrorFun) ->
 handle_push_result(Json, RegIds, undefined) ->
     {_Multicast, _Success, _Failure, _Canonical, Results} = get_response_fields(Json),
     lists:map(fun({Result, RegId}) -> parse_results(Result, RegId, fun(E, I) -> {E, I} end) end,
-        lists:zip(Results, RegIds));
+	      lists:zip(Results, RegIds));
 
 handle_push_result(Json, RegIds, ErrorFun) ->
     {_Multicast, _Success, Failure, Canonical, Results} = get_response_fields(Json),
     case to_be_parsed(Failure, Canonical) of
         true ->
             lists:foreach(fun({Result, RegId}) -> parse_results(Result, RegId, ErrorFun) end,
-                lists:zip(Results, RegIds));
+			  lists:zip(Results, RegIds));
         false ->
             ok
     end.
@@ -222,11 +222,11 @@ response_to_binary(Json) when is_list(Json) ->
 
 get_response_fields(Json) ->
     {
-        proplists:get_value(<<"multicast_id">>, Json),
-        proplists:get_value(<<"success">>, Json),
-        proplists:get_value(<<"failure">>, Json),
-        proplists:get_value(<<"canonical_ids">>, Json),
-        proplists:get_value(<<"results">>, Json)
+      proplists:get_value(<<"multicast_id">>, Json),
+      proplists:get_value(<<"success">>, Json),
+      proplists:get_value(<<"failure">>, Json),
+      proplists:get_value(<<"canonical_ids">>, Json),
+      proplists:get_value(<<"results">>, Json)
     }.
 
 to_be_parsed(0, 0) -> false;
@@ -235,10 +235,10 @@ to_be_parsed(_Failure, _Canonical) -> true.
 
 parse_results(Result, RegId, ErrorFun) ->
     case {
-        proplists:get_value(<<"error">>, Result),
-        proplists:get_value(<<"message_id">>, Result),
-        proplists:get_value(<<"registration_id">>, Result)
-    } of
+      proplists:get_value(<<"error">>, Result),
+      proplists:get_value(<<"message_id">>, Result),
+      proplists:get_value(<<"registration_id">>, Result)
+     } of
         {Error, undefined, undefined} when Error =/= undefined ->
             ErrorFun(Error, RegId);
         {undefined, MessageId, undefined} when MessageId =/= undefined ->
