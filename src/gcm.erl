@@ -171,44 +171,43 @@ do_push(RegIds, Message, Key, ErrorFun) ->
             Json = jsx:decode(response_to_binary(Body)),
             handle_push_result(Json, RegIds, ErrorFun);
         {error, Reason} ->
-            %% Some general error during the request.
-	    error_logger:error_msg("error in request: ~p~n", [Reason]),
+	    error_logger:error_msg("Error in request. Reason was: ~p~n", [Reason]),
             {error, Reason};
         {ok, {{_, 400, _}, _, _}} ->
-            %% Some error in the Json.
+	    error_logger:error_msg("Error in request. Reason was: json_error~n", []),
             {error, json_error};
         {ok, {{_, 401, _}, _, _}} ->
-            %% Some error in the authorization.
-	    error_logger:error_msg("authorization error!", []),
+	    error_logger:error_msg("Error in request. Reason was: authorization error~n", []),
             {error, auth_error};
         {ok, {{_, Code, _}, Headers, _}} when Code >= 500 andalso Code =< 599 ->
 	    RetryTime = headers_parser:retry_after_from(Headers),
+	    error_logger:error_msg("Error in request. Reason was: retry. Will retry in: ~p~n", [RetryTime]),
 	    do_backoff(RetryTime, RegIds, Message, Key, ErrorFun) ,
             {error, retry};
         {ok, {{_StatusLine, _, _}, _, _Body}} ->
-            %% Request handled but some error like timeout happened.
+	    error_logger:error_msg("Error in request. Reason was: timeout~n", []),
             {error, timeout};
         OtherError ->
-            %% Some other nasty error.
-	    error_logger:error_msg("other error: ~p~n", [OtherError]),
+	    error_logger:error_msg("Error in request. Reason was: ~p~n", [OtherError]),
             {noreply, unknown}
     catch
         Exception ->
-	    error_logger:error_msg("exception ~p in call to URL: ~p~n", [Exception, ?BASEURL]),
+	    error_logger:error_msg("Error in request. Exception ~p while calling URL: ~p~n", [Exception, ?BASEURL]),
             {error, Exception}
     end.
 
 
 handle_push_result(Json, RegIds, undefined) ->
     {_Multicast, _Success, _Failure, _Canonical, Results} = get_response_fields(Json),
-    lists:map(fun({Result, RegId}) -> parse_results(Result, RegId, fun(E, I) -> {E, I} end) end,
-	      lists:zip(Results, RegIds));
+    lists:map(fun({Result, RegId}) -> 
+		      parse_result(Result, RegId, fun(E, I) -> {E, I} end) 
+	      end, lists:zip(Results, RegIds));
 
 handle_push_result(Json, RegIds, ErrorFun) ->
     {_Multicast, _Success, Failure, Canonical, Results} = get_response_fields(Json),
     case to_be_parsed(Failure, Canonical) of
         true ->
-            lists:foreach(fun({Result, RegId}) -> parse_results(Result, RegId, ErrorFun) end,
+            lists:foreach(fun({Result, RegId}) -> parse_result(Result, RegId, ErrorFun) end,
 			  lists:zip(Results, RegIds));
         false ->
             ok
@@ -233,7 +232,7 @@ to_be_parsed(0, 0) -> false;
 
 to_be_parsed(_Failure, _Canonical) -> true.
 
-parse_results(Result, RegId, ErrorFun) ->
+parse_result(Result, RegId, ErrorFun) ->
     case {
       proplists:get_value(<<"error">>, Result),
       proplists:get_value(<<"message_id">>, Result),
