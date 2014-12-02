@@ -10,10 +10,6 @@
 
 -behaviour(gen_server).
 
--ifdef(TEST).
--compile(export_all).
--endif.
-
 %% API
 -export([start/2, start/3, stop/1, start_link/2, start_link/3]).
 -export([push/3, sync_push/3, update_error_fun/2]).
