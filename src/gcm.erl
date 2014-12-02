@@ -213,6 +213,15 @@ handle_push_result(Json, RegIds, ErrorFun) ->
             ok
     end.
 
+
+do_backoff(RetryTime, RegIds, Message, Key, ErrorFun) ->
+    case RetryTime of
+	{ok, Time} ->
+	    timer:apply_after(Time * 1000, ?MODULE, do_push, [RegIds, Message, Key, ErrorFun]);
+	no_retry ->
+	    ok
+    end.
+
 response_to_binary(Json) when is_binary(Json) ->
     Json;
 
@@ -285,11 +294,3 @@ handle_error(UnexpectedError, RegId) ->
 %%	<<"InvalidTtl">>					%%
 %%								%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-do_backoff(RetryTime, RegIds, Message, Key, ErrorFun) ->
-    case RetryTime of
-	{ok, Time} ->
-	    timer:apply_after(Time * 1000, ?MODULE, do_push, [RegIds, Message, Key, ErrorFun]);
-	no_retry ->
-	    ok
-    end.
