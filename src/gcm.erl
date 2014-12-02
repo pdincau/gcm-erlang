@@ -198,14 +198,14 @@ do_push(RegIds, Message, Key, ErrorFun) ->
 
 
 handle_push_result(Json, RegIds, undefined) ->
-    {_Multicast, _Success, _Failure, _Canonical, Results} = fields_from(Json),
+    {_MulticastId, _SuccessesNumber, _FailuresNumber, _CanonicalIdsNumber, Results} = fields_from(Json),
     lists:map(fun({Result, RegId}) -> 
 		      parse_result(Result, RegId, fun(E, I) -> {E, I} end) 
 	      end, lists:zip(Results, RegIds));
 
 handle_push_result(Json, RegIds, ErrorFun) ->
-    {_Multicast, _Success, Failure, Canonical, Results} = fields_from(Json),
-    case to_be_parsed(Failure, Canonical) of
+    {_MulticastId, _SuccessesNumber, FailuresNumber, CanonicalIdsNumber, Results} = fields_from(Json),
+    case to_be_parsed(FailuresNumber, CanonicalIdsNumber) of
         true ->
             lists:foreach(fun({Result, RegId}) -> parse_result(Result, RegId, ErrorFun) end,
 			  lists:zip(Results, RegIds));
