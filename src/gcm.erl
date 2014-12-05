@@ -3,10 +3,11 @@
 -behaviour(gen_server).
 
 -export([start/2, start/3, stop/1, start_link/2, start_link/3]).
--export([push/3, sync_push/3, update_error_fun/2]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
+
+-export([push/3, sync_push/3, update_error_fun/2]).
 
 -define(SERVER, ?MODULE).
 
