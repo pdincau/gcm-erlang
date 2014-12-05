@@ -1,20 +1,10 @@
-%%%-------------------------------------------------------------------
-%%% @author Paolo D'Incau <paolo.dincau@gmail.com>
-%%% @copyright (C) 2013, Paolo D'Incau
-%%% @doc
-%%%
-%%% @end
-%%% Created : 18 Apr 2013 by Paolo D'Incau <paolo.dincau@gmail.com>
-%%%-------------------------------------------------------------------
 -module(gcm).
 
 -behaviour(gen_server).
 
-%% API
 -export([start/2, start/3, stop/1, start_link/2, start_link/3]).
 -export([push/3, sync_push/3, update_error_fun/2]).
 
-%% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
@@ -24,22 +14,12 @@
 
 -record(state, {key, retry_after, error_fun}).
 
-%%%===================================================================
-%%% API
-%%%===================================================================
 start(Name, Key) ->
     start(Name, Key, fun handle_error/2).
 
 start(Name, Key, ErrorFun) ->
     gcm_sup:start_child(Name, Key, ErrorFun).
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts the server
-%%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
-%% @end
-%%--------------------------------------------------------------------
 start_link(Name, Key) ->
     start_link(Name, Key, fun handle_error/2).
 
@@ -57,38 +37,10 @@ sync_push(Name, RegIds, Message) ->
 
 update_error_fun(Name, Fun) ->
     gen_server:cast(Name, {error_fun, Fun}).
-%%%===================================================================
-%%% gen_server callbacks
-%%%===================================================================
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Initializes the server
-%%
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
-%% @end
-%%--------------------------------------------------------------------
 init([Key, ErrorFun]) ->
     {ok, #state{key=Key, retry_after=0, error_fun=ErrorFun}}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling call messages
-%%
-%% @spec handle_call(Request, From, State) ->
-%%                                   {reply, Reply, State} |
-%%                                   {reply, Reply, State, Timeout} |
-%%                                   {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, Reply, State} |
-%%                                   {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
 handle_call(stop, _From, State) ->
     {stop, normal, stopped, State};
 
@@ -99,16 +51,6 @@ handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling cast messages
-%%
-%% @spec handle_cast(Msg, State) -> {noreply, State} |
-%%                                  {noreply, State, Timeout} |
-%%                                  {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
 handle_cast({send, RegIds, Message}, #state{key=Key, error_fun=ErrorFun} = State) ->
     do_push(RegIds, Message, Key, ErrorFun),
     {noreply, State};
@@ -120,52 +62,21 @@ handle_cast({error_fun, Fun}, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Handling all non call/cast messages
-%%
-%% @spec handle_info(Info, State) -> {noreply, State} |
-%%                                   {noreply, State, Timeout} |
-%%                                   {stop, Reason, State}
-%% @end
-%%--------------------------------------------------------------------
 handle_info(_Info, State) ->
     {noreply, State}.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_server terminates
-%% with Reason. The return value is ignored.
-%%
-%% @spec terminate(Reason, State) -> void()
-%% @end
-%%--------------------------------------------------------------------
 terminate(_Reason, _State) ->
     ok.
 
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% Convert process state when code is changed
-%%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
-%% @end
-%%--------------------------------------------------------------------
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-%%%===================================================================
-%%% Internal functions
-%%%===================================================================
+
 do_push(RegIds, Message, Key, ErrorFun) ->
     error_logger:info_msg("Message=~p; RegIds=~p~n", [Message, RegIds]),
     Request = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
     ApiKey = string:concat("key=", Key),
-    
+
     try httpc:request(post, {?BASEURL, [{"Authorization", ApiKey}], "application/json", Request}, [], []) of
         {ok, {{_, 200, _}, _Headers, Body}} ->
             Json = jsx:decode(response_to_binary(Body)),
