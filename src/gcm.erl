@@ -44,7 +44,8 @@ handle_call(stop, _From, State) ->
     {stop, normal, stopped, State};
 
 handle_call({send, RegIds, Message}, _From, #state{key=Key} = State) ->
-    {reply, do_push(RegIds, Message, Key, undefined), State};
+    Reply = do_push(RegIds, Message, Key, undefined),
+    {reply, Reply, State};
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
