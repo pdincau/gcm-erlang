@@ -15,11 +15,15 @@ Using `gcm-erlang` you can:
 
 So far `gcm-erlang` does only provide support for JSON messages since GCM does not allow to send multicast messages using plain text.
 
-### How to compile the application gcm-erlang:
+### How to compile:
 
 The first thing you have to do is to compile all the Erlang files using `rebar`.
 
     $ ./rebar get-deps compile
+
+### How to run tests:
+
+    ./rebar compile && ./rebar skip_deps=true eunit
 
 ### How to run the application gcm-erlang:
 
