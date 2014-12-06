@@ -71,7 +71,7 @@ The JSON message is built using `jsx` in the module `gcm.erl` and in the end wil
       "collapse_key" : "your_update"
     }
 
-You can send this message using this sentence:
+You can send this message using:
 
     8> gcm:push(RegisteredName, RegIds, [{<<"data">>, [
     8>     {<<"message">>, <<"a message">>}
