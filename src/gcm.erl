@@ -1,5 +1,4 @@
 -module(gcm).
-
 -behaviour(gen_server).
 
 -export([start/2, start/3, stop/1, start_link/2, start_link/3]).
