@@ -86,8 +86,8 @@ do_push(RegIds, Message, Key, ErrorFun) ->
 
 handle_result(GCMResult, RegIds, undefined) ->
     {_MulticastId, _SuccessesNumber, _FailuresNumber, _CanonicalIdsNumber, Results} = GCMResult,
-    lists:map(fun({Result, RegId}) -> 
-		      parse_result(Result, RegId, fun(E, I) -> {E, I} end) 
+    lists:map(fun({Result, RegId}) ->
+		      parse_result(Result, RegId, fun(E, I) -> {E, I} end)
 	      end, lists:zip(Results, RegIds));
 
 handle_result(GCMResult, RegIds, ErrorFun) ->

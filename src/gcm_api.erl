@@ -1,5 +1,5 @@
 -module(gcm_api).
--export([push/3]).
+-export([push/3, retry_after_from/1]).
 
 -define(BASEURL, "https://android.googleapis.com/gcm/send").
 
@@ -21,7 +21,7 @@ push(RegIds, Message, Key) ->
 	    error_logger:error_msg("Error in request. Reason was: authorization error~n", []),
             {error, auth_error};
         {ok, {{_, Code, _}, Headers, _}} when Code >= 500 andalso Code =< 599 ->
-	    RetryTime = headers_parser:retry_after_from(Headers),
+	    RetryTime = retry_after_from(Headers),
 	    error_logger:error_msg("Error in request. Reason was: retry. Will retry in: ~p~n", [RetryTime]),
             {error, {retry, RetryTime}};
         {ok, {{_StatusLine, _, _}, _, _Body}} ->
@@ -50,3 +50,17 @@ result_from(Json) ->
       proplists:get_value(<<"canonical_ids">>, Json),
       proplists:get_value(<<"results">>, Json)
     }.
+
+retry_after_from(Headers) ->
+    case proplists:get_value("retry-after", Headers) of
+	undefined ->
+	    no_retry;
+	RetryTime ->
+	    case string:to_integer(RetryTime) of
+		{Time, _} when is_integer(Time) ->
+		    {ok, Time};
+		{error,no_integer} ->
+		    Date = qdate:to_unixtime(RetryTime),
+		    {ok, Date - qdate:unixtime()}
+	    end
+    end.
