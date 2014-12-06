@@ -75,7 +75,7 @@ do_push(RegIds, Message, Key, ErrorFun) ->
     error_logger:info_msg("Message=~p; RegIds=~p~n", [Message, RegIds]),
     case gcm_api:push(RegIds, Message, Key) of
         {ok, GCMResult} ->
-            handle_result(GCMResult, RegIds, ErrorFun); 
+            handle_result(GCMResult, RegIds, ErrorFun);
         {error, {retry, RetryTime}} ->
             do_backoff(RetryTime, RegIds, Message, Key, ErrorFun),
             {error, retry};
