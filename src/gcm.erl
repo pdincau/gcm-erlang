@@ -11,8 +11,6 @@
 
 -define(SERVER, ?MODULE).
 
--define(BASEURL, "https://android.googleapis.com/gcm/send").
-
 -record(state, {key, retry_after, error_fun}).
 
 start(Name, Key) ->
@@ -75,39 +73,15 @@ code_change(_OldVsn, State, _Extra) ->
 
 do_push(RegIds, Message, Key, ErrorFun) ->
     error_logger:info_msg("Message=~p; RegIds=~p~n", [Message, RegIds]),
-    Request = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
-    ApiKey = string:concat("key=", Key),
-
-    try httpc:request(post, {?BASEURL, [{"Authorization", ApiKey}], "application/json", Request}, [], []) of
-        {ok, {{_, 200, _}, _Headers, Body}} ->
-            Json = jsx:decode(response_to_binary(Body)),
-            handle_push_result(Json, RegIds, ErrorFun);
-        {error, Reason} ->
-	    error_logger:error_msg("Error in request. Reason was: ~p~n", [Reason]),
-            {error, Reason};
-        {ok, {{_, 400, _}, _, _}} ->
-	    error_logger:error_msg("Error in request. Reason was: json_error~n", []),
-            {error, json_error};
-        {ok, {{_, 401, _}, _, _}} ->
-	    error_logger:error_msg("Error in request. Reason was: authorization error~n", []),
-            {error, auth_error};
-        {ok, {{_, Code, _}, Headers, _}} when Code >= 500 andalso Code =< 599 ->
-	    RetryTime = headers_parser:retry_after_from(Headers),
-	    error_logger:error_msg("Error in request. Reason was: retry. Will retry in: ~p~n", [RetryTime]),
-	    do_backoff(RetryTime, RegIds, Message, Key, ErrorFun) ,
+    case gcm_api:push(RegIds, Message, Key) of
+        {ok, Result} ->
+            handle_push_result(Result, RegIds, ErrorFun); 
+        {error, {retry, RetryTime}} ->
+            do_backoff(RetryTime, RegIds, Message, Key, ErrorFun),
             {error, retry};
-        {ok, {{_StatusLine, _, _}, _, _Body}} ->
-	    error_logger:error_msg("Error in request. Reason was: timeout~n", []),
-            {error, timeout};
-        OtherError ->
-	    error_logger:error_msg("Error in request. Reason was: ~p~n", [OtherError]),
-            {noreply, unknown}
-    catch
-        Exception ->
-	    error_logger:error_msg("Error in request. Exception ~p while calling URL: ~p~n", [Exception, ?BASEURL]),
-            {error, Exception}
+        {error, Reason} ->
+            {error, Reason}
     end.
-
 
 handle_push_result(Json, RegIds, undefined) ->
     {_MulticastId, _SuccessesNumber, _FailuresNumber, _CanonicalIdsNumber, Results} = fields_from(Json),
@@ -133,12 +107,6 @@ do_backoff(RetryTime, RegIds, Message, Key, ErrorFun) ->
 	no_retry ->
 	    ok
     end.
-
-response_to_binary(Json) when is_binary(Json) ->
-    Json;
-
-response_to_binary(Json) when is_list(Json) ->
-    list_to_binary(Json).
 
 fields_from(Json) ->
     {
