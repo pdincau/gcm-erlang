@@ -19,12 +19,6 @@ start(Name, Key) ->
 start(Name, Key, ErrorFun) ->
     gcm_sup:start_child(Name, Key, ErrorFun).
 
-start_link(Name, Key) ->
-    start_link(Name, Key, fun handle_error/2).
-
-start_link(Name, Key, ErrorFun) ->
-    gen_server:start_link({local, Name}, ?MODULE, [Key, ErrorFun], []).
-
 stop(Name) ->
     gen_server:call(Name, stop).
 
@@ -36,6 +30,13 @@ sync_push(Name, RegIds, Message) ->
 
 update_error_fun(Name, Fun) ->
     gen_server:cast(Name, {error_fun, Fun}).
+
+%% OTP
+start_link(Name, Key) ->
+    start_link(Name, Key, fun handle_error/2).
+
+start_link(Name, Key, ErrorFun) ->
+    gen_server:start_link({local, Name}, ?MODULE, [Key, ErrorFun], []).
 
 init([Key, ErrorFun]) ->
     {ok, #state{key=Key, retry_after=0, error_fun=ErrorFun}}.
@@ -70,7 +71,7 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-
+%% Internal
 do_push(RegIds, Message, Key, ErrorFun) ->
     error_logger:info_msg("Message=~p; RegIds=~p~n", [Message, RegIds]),
     case gcm_api:push(RegIds, Message, Key) of
