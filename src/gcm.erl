@@ -74,8 +74,8 @@ code_change(_OldVsn, State, _Extra) ->
 do_push(RegIds, Message, Key, ErrorFun) ->
     error_logger:info_msg("Message=~p; RegIds=~p~n", [Message, RegIds]),
     case gcm_api:push(RegIds, Message, Key) of
-        {ok, Result} ->
-            handle_push_result(Result, RegIds, ErrorFun); 
+        {ok, GCMResult} ->
+            handle_result(GCMResult, RegIds, ErrorFun); 
         {error, {retry, RetryTime}} ->
             do_backoff(RetryTime, RegIds, Message, Key, ErrorFun),
             {error, retry};
@@ -83,14 +83,14 @@ do_push(RegIds, Message, Key, ErrorFun) ->
             {error, Reason}
     end.
 
-handle_push_result(Json, RegIds, undefined) ->
-    {_MulticastId, _SuccessesNumber, _FailuresNumber, _CanonicalIdsNumber, Results} = fields_from(Json),
+handle_result(GCMResult, RegIds, undefined) ->
+    {_MulticastId, _SuccessesNumber, _FailuresNumber, _CanonicalIdsNumber, Results} = GCMResult,
     lists:map(fun({Result, RegId}) -> 
 		      parse_result(Result, RegId, fun(E, I) -> {E, I} end) 
 	      end, lists:zip(Results, RegIds));
 
-handle_push_result(Json, RegIds, ErrorFun) ->
-    {_MulticastId, _SuccessesNumber, FailuresNumber, CanonicalIdsNumber, Results} = fields_from(Json),
+handle_result(GCMResult, RegIds, ErrorFun) ->
+    {_MulticastId, _SuccessesNumber, FailuresNumber, CanonicalIdsNumber, Results} = GCMResult,
     case to_be_parsed(FailuresNumber, CanonicalIdsNumber) of
         true ->
             lists:foreach(fun({Result, RegId}) -> parse_result(Result, RegId, ErrorFun) end,
@@ -99,7 +99,6 @@ handle_push_result(Json, RegIds, ErrorFun) ->
             ok
     end.
 
-
 do_backoff(RetryTime, RegIds, Message, Key, ErrorFun) ->
     case RetryTime of
 	{ok, Time} ->
@@ -107,15 +106,6 @@ do_backoff(RetryTime, RegIds, Message, Key, ErrorFun) ->
 	no_retry ->
 	    ok
     end.
-
-fields_from(Json) ->
-    {
-      proplists:get_value(<<"multicast_id">>, Json),
-      proplists:get_value(<<"success">>, Json),
-      proplists:get_value(<<"failure">>, Json),
-      proplists:get_value(<<"canonical_ids">>, Json),
-      proplists:get_value(<<"results">>, Json)
-    }.
 
 to_be_parsed(0, 0) -> false;
 

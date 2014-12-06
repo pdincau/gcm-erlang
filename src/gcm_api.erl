@@ -10,7 +10,7 @@ push(RegIds, Message, Key) ->
     try httpc:request(post, {?BASEURL, [{"Authorization", ApiKey}], "application/json", Request}, [], []) of
         {ok, {{_, 200, _}, _Headers, Body}} ->
             Json = jsx:decode(response_to_binary(Body)),
-            {ok, Json};
+            {ok, result_from(Json)};
         {error, Reason} ->
 	    error_logger:error_msg("Error in request. Reason was: ~p~n", [Reason]),
             {error, Reason};
@@ -41,3 +41,12 @@ response_to_binary(Json) when is_binary(Json) ->
 
 response_to_binary(Json) when is_list(Json) ->
     list_to_binary(Json).
+
+result_from(Json) ->
+    {
+      proplists:get_value(<<"multicast_id">>, Json),
+      proplists:get_value(<<"success">>, Json),
+      proplists:get_value(<<"failure">>, Json),
+      proplists:get_value(<<"canonical_ids">>, Json),
+      proplists:get_value(<<"results">>, Json)
+    }.
