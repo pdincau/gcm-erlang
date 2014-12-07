@@ -59,7 +59,7 @@ retry_after_from(Headers) ->
 	    case string:to_integer(RetryTime) of
 		{Time, _} when is_integer(Time) ->
 		    {ok, Time};
-		{error,no_integer} ->
+		{error, no_integer} ->
 		    Date = qdate:to_unixtime(RetryTime),
 		    {ok, Date - qdate:unixtime()}
 	    end
