@@ -3,14 +3,12 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
-get_retry_after_when_present_test() ->
+get_retry_after_when_http_date_test() ->
     application:start(qdate),
-    TargetDate = qdate:add_seconds(120, qdate:unixtime()),
-    TargetTime = qdate:to_string("Y-m-d h:ia",TargetDate),
-    Headers = [{"retry-after", TargetTime}],
+    Headers = [{"retry-after", "Fri, 31 Dec 1999 23:59:59 GMT"}],
     ?assertMatch({ok, I} when is_integer(I), gcm_api:retry_after_from(Headers)).
 
-get_retry_after_when_present_as_string_test() ->
+get_retry_after_when_seconds_interval_test() ->
     Headers = [{"retry-after", "120"}],
     ?assertEqual({ok, 120}, gcm_api:retry_after_from(Headers)).
 
