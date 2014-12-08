@@ -102,10 +102,10 @@ handle_result(GCMResult, RegIds, ErrorFun) ->
 
 do_backoff(RetryTime, RegIds, Message, Key, ErrorFun) ->
     case RetryTime of
+        no_retry ->
+            ok;
 	{ok, Time} ->
-	    timer:apply_after(Time * 1000, ?MODULE, do_push, [RegIds, Message, Key, ErrorFun]);
-	no_retry ->
-	    ok
+	    timer:apply_after(Time * 1000, ?MODULE, do_push, [RegIds, Message, Key, ErrorFun])
     end.
 
 to_be_parsed(0, 0) -> false;

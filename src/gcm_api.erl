@@ -1,5 +1,5 @@
 -module(gcm_api).
--export([push/3, retry_after_from/1]).
+-export([push/3]).
 
 -define(BASEURL, "https://android.googleapis.com/gcm/send").
 
@@ -58,9 +58,9 @@ retry_after_from(Headers) ->
 	RetryTime ->
 	    case string:to_integer(RetryTime) of
 		{Time, _} when is_integer(Time) ->
-		    {ok, Time};
+		    Time;
 		{error, no_integer} ->
 		    Date = qdate:to_unixtime(RetryTime),
-		    {ok, Date - qdate:unixtime()}
+		    Date - qdate:unixtime()
 	    end
     end.
