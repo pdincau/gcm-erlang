@@ -73,7 +73,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% Internal
 do_push(RegIds, Message, Key, ErrorFun) ->
-    error_logger:info_msg("Message=~p; RegIds=~p~n", [Message, RegIds]),
+    error_logger:info_msg("Sending message: ~p to reg ids: ~p~n", [Message, RegIds]),
     case gcm_api:push(RegIds, Message, Key) of
         {ok, GCMResult} ->
             handle_result(GCMResult, RegIds, ErrorFun);
