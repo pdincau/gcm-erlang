@@ -6,6 +6,7 @@
         kernel,
         stdlib,
         inets,
+        ssl,
         jsx
     ]},
     {mod, {gcm_app, []}},
