@@ -27,10 +27,16 @@ The first thing you have to do is to compile all the Erlang files using `rebar`.
 
 ### How to run the application gcm-erlang:
 
-Once all the Erlang files are compiled you can start the application `gcm-erlang`. The application does use the module `httpc` so it is mandatory to  start also the Erlang application `inets`.
+Once all the Erlang files are compiled you can start the application `gcm-erlang`. This application depends on other applications  so it is mandatory to  start them as well.
 
     $ erl -pa deps/*/ebin -pa ebin
-    1> application:start(gcm).
+    1> application:start(inets).
+    ok
+    2> application:start(jsx).
+    ok
+    3> ssl:start().
+    ok
+    4> application:start(gcm).
     ok
 
 ### How to start/stop different gen_servers under application gcm-erlang (one for each GCM application):
