@@ -104,7 +104,7 @@ do_backoff(RetryTime, RegIds, Message, Key, ErrorFun) ->
     case RetryTime of
         no_retry ->
             ok;
-	{ok, Time} ->
+	Time ->
 	    timer:apply_after(Time * 1000, ?MODULE, do_push, [RegIds, Message, Key, ErrorFun])
     end.
 
