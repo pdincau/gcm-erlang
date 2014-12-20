@@ -13,7 +13,7 @@
 -record(state, {key, retry_after, error_fun}).
 
 start(Name, Key) ->
-    start(Name, Key, fun handle_error/2).
+    start(Name, Key, fun log_error/2).
 
 start(Name, Key, ErrorFun) ->
     gcm_sup:start_child(Name, Key, ErrorFun).
@@ -32,7 +32,7 @@ update_error_fun(Name, Fun) ->
 
 %% OTP
 start_link(Name, Key) ->
-    start_link(Name, Key, fun handle_error/2).
+    start_link(Name, Key, fun log_error/2).
 
 start_link(Name, Key, ErrorFun) ->
     gen_server:start_link({local, Name}, ?MODULE, [Key, ErrorFun], []).
@@ -126,31 +126,31 @@ parse_result(Result, RegId, ErrorFun) ->
             ErrorFun(<<"NewRegistrationId">>, {RegId, NewRegId})
     end.
 
-handle_error(<<"NewRegistrationId">>, {RegId, NewRegId}) ->
+log_error(<<"NewRegistrationId">>, {RegId, NewRegId}) ->
     error_logger:info_msg("Message sent. Update id ~p with new id ~p.~n", [RegId, NewRegId]),
     ok;
 
-handle_error(<<"Unavailable">>, RegId) ->
+log_error(<<"Unavailable">>, RegId) ->
     %% The server couldn't process the request in time. Retry later with exponential backoff.
     error_logger:error_msg("unavailable ~p~n", [RegId]),
     ok;
 
-handle_error(<<"InternalServerError">>, RegId) ->
+log_error(<<"InternalServerError">>, RegId) ->
     % GCM had an internal server error. Retry later with exponential backoff.
     error_logger:error_msg("internal server error ~p~n", [RegId]),
     ok;
 
-handle_error(<<"InvalidRegistration">>, RegId) ->
+log_error(<<"InvalidRegistration">>, RegId) ->
     %% Invalid registration id in database.
     error_logger:error_msg("invalid registration ~p~n", [RegId]),
     ok;
 
-handle_error(<<"NotRegistered">>, RegId) ->
+log_error(<<"NotRegistered">>, RegId) ->
     %% Application removed. Delete device from database.
     error_logger:error_msg("not registered ~p~n", [RegId]),
     ok;
 
-handle_error(UnexpectedError, RegId) ->
+log_error(UnexpectedError, RegId) ->
     %% There was an unexpected error that couldn't be identified.
     error_logger:error_msg("unexpected error ~p in ~p~n", [UnexpectedError, RegId]),
     ok.
