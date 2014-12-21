@@ -1,5 +1,4 @@
 -module(gcm_sup).
-
 -behaviour(supervisor).
 
 -export([start_link/0, start_child/3]).
