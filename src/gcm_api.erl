@@ -11,9 +11,6 @@ push(RegIds, Message, Key) ->
         {ok, {{_, 200, _}, _Headers, Body}} ->
             Json = jsx:decode(response_to_binary(Body)),
             {ok, result_from(Json)};
-        {error, Reason} ->
-	    error_logger:error_msg("Error in request. Reason was: ~p~n", [Reason]),
-            {error, Reason};
         {ok, {{_, 400, _}, _, _}} ->
 	    error_logger:error_msg("Error in request. Reason was: json_error~n", []),
             {error, json_error};
@@ -27,6 +24,9 @@ push(RegIds, Message, Key) ->
         {ok, {{_StatusLine, _, _}, _, _Body}} ->
 	    error_logger:error_msg("Error in request. Reason was: timeout~n", []),
             {error, timeout};
+        {error, Reason} ->
+	    error_logger:error_msg("Error in request. Reason was: ~p~n", [Reason]),
+            {error, Reason};
         OtherError ->
 	    error_logger:error_msg("Error in request. Reason was: ~p~n", [OtherError]),
             {noreply, unknown}
