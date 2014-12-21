@@ -154,14 +154,3 @@ log_error(UnexpectedError, RegId) ->
     %% There was an unexpected error that couldn't be identified.
     error_logger:error_msg("unexpected error ~p in ~p~n", [UnexpectedError, RegId]),
     ok.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Other possible errors:					%%
-%%	<<"InvalidPackageName">>				%%
-%%      <<"MissingRegistration">>				%%
-%%	<<"MismatchSenderId">>					%%
-%%	<<"MessageTooBig">>					%%
-%%      <<"InvalidDataKey">>					%%
-%%	<<"InvalidTtl">>					%%
-%%								%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
