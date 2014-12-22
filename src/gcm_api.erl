@@ -5,7 +5,11 @@
 
 -type header()  :: {string(), string()}.
 -type headers() :: [header(),...].
+-type regids()  :: [binary(),...].
+-type message() :: [tuple(),...].
+-type result()  :: {number(), non_neg_integer(), non_neg_integer(), non_neg_integer(), [any()]}.
 
+-spec push(regids(),message(),string()) -> {'error',any()} | {'noreply','unknown'} | {'ok',result()}.
 push(RegIds, Message, Key) ->
     Request = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
     ApiKey = string:concat("key=", Key),
