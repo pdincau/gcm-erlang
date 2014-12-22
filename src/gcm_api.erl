@@ -39,6 +39,7 @@ push(RegIds, Message, Key) ->
             {error, Exception}
     end.
 
+-spec response_to_binary(binary() | list()) -> binary().
 response_to_binary(Json) when is_binary(Json) ->
     Json;
 
