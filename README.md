@@ -21,9 +21,17 @@ The first thing you have to do is to compile all the Erlang files using `rebar`.
 
     $ ./rebar get-deps compile
 
-### How to run tests:
+### How to use with rebar
 
-    ./rebar compile && ./rebar skip_deps=true eunit
+You can use gcm_app as a dependency in your rebar.config:
+
+    {deps , [
+        {gcm, ".*", {git, "https://github.com/pdincau/gcm-erlang.git", {tag, "1.0.0"}}}
+    ]}.
+
+###How to run tests:
+
+    ./rebar compile && ./rebar skip_deps=true eunit && ./run-dialyzer.sh
 
 ### How to run the application gcm-erlang:
 
