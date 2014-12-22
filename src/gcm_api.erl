@@ -50,6 +50,7 @@ response_to_binary(Json) when is_binary(Json) ->
 response_to_binary(Json) when is_list(Json) ->
     list_to_binary(Json).
 
+-spec result_from([{binary(),any()}]) -> {_,_,_,_,_}.
 result_from(Json) ->
     {
       proplists:get_value(<<"multicast_id">>, Json),
