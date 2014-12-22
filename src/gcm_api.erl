@@ -3,6 +3,9 @@
 
 -define(BASEURL, "https://android.googleapis.com/gcm/send").
 
+-type header()  :: {string(), string()}.
+-type headers() :: [header(),...].
+
 push(RegIds, Message, Key) ->
     Request = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
     ApiKey = string:concat("key=", Key),
@@ -51,6 +54,7 @@ result_from(Json) ->
       proplists:get_value(<<"results">>, Json)
     }.
 
+-spec retry_after_from(headers()) -> 'no_retry' | number().
 retry_after_from(Headers) ->
     case proplists:get_value("retry-after", Headers) of
 	undefined ->
