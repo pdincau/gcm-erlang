@@ -2,16 +2,12 @@
 
 -behaviour(application).
 
--export([start/0]).
 -export([start/2, stop/1]).
 
-start() ->
-    application:start(inets),
-    application:start(jsx),
-    application:start(gcm).
-
+-spec start(_, _) -> {ok, pid()}.
 start(_StartType, _StartArgs) ->
     gcm_sup:start_link().
 
+-spec stop(_) -> ok.
 stop(_State) ->
     ok.
