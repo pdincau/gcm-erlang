@@ -21,7 +21,7 @@ The first thing you have to do is to compile all the Erlang files using `rebar`.
 
     $ ./rebar get-deps compile
 
-### How to use with rebar
+### How to use with rebar:
 
 You can use gcm_app as a dependency in your rebar.config:
 
