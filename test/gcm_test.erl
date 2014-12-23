@@ -88,8 +88,8 @@ receive_results_from_sync_push(_) ->
         end),
     Result = gcm:sync_push(test, [<<"Token0">>, <<"Token1">>, <<"Token2">>],
         [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
-    ExpectedResult = [ok, {<<"InvalidRegistration">>, <<"Token1">>},
-        {<<"NewRegistrationId">>, {<<"Token2">>, <<"NewToken">>}}],
+    ExpectedResult = [ok, {<<"Token1">>, <<"InvalidRegistration">>},
+        {<<"Token2">>, {<<"NewRegistrationId">>, <<"NewToken">>}}],
     [
         {"Results are passed to the caller", ?_assertMatch(ExpectedResult, Result)},
         {"Validate httpc", ?_assert(meck:validate(httpc))}

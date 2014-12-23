@@ -1,7 +1,7 @@
 -module(gcm_sup).
 -behaviour(supervisor).
 
--export([start_link/0, start_child/3]).
+-export([start_link/0, start_child/2]).
 
 -export([init/1]).
 
@@ -11,10 +11,10 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
--spec start_child(atom(),string(),fun()) ->
+-spec start_child(atom(),string()) ->
        {'error',_} | {'ok','undefined' | pid()} | {'ok','undefined' | pid(),_}.
-start_child(Name, ApiKey, ErrorFun) ->
-    supervisor:start_child(?MODULE, [Name, ApiKey, ErrorFun]).
+start_child(Name, ApiKey) ->
+    supervisor:start_child(?MODULE, [Name, ApiKey]).
 
 -spec init([]) -> {ok, {{supervisor:strategy(), 5, 10}, [supervisor:child_spec()]}}.
 init([]) ->

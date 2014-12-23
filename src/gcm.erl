@@ -1,22 +1,19 @@
 -module(gcm).
 -behaviour(gen_server).
 
--export([start/2, start/3, stop/1, start_link/2, start_link/3]).
+-export([start/2, stop/1, start_link/2]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
--export([push/3, sync_push/3, update_error_fun/2]).
+-export([push/3, sync_push/3]).
 
 -define(SERVER, ?MODULE).
 
--record(state, {key, error_fun}).
+-record(state, {key}).
 
 start(Name, Key) ->
-    start(Name, Key, fun log_error/2).
-
-start(Name, Key, ErrorFun) ->
-    gcm_sup:start_child(Name, Key, ErrorFun).
+    gcm_sup:start_child(Name, Key).
 
 stop(Name) ->
     gen_server:call(Name, stop).
@@ -27,37 +24,27 @@ push(Name, RegIds, Message) ->
 sync_push(Name, RegIds, Message) ->
     gen_server:call(Name, {send, RegIds, Message}).
 
-update_error_fun(Name, Fun) ->
-    gen_server:cast(Name, {error_fun, Fun}).
-
 %% OTP
 start_link(Name, Key) ->
-    start_link(Name, Key, fun log_error/2).
+    gen_server:start_link({local, Name}, ?MODULE, [Key], []).
 
-start_link(Name, Key, ErrorFun) ->
-    gen_server:start_link({local, Name}, ?MODULE, [Key, ErrorFun], []).
-
-init([Key, ErrorFun]) ->
-    {ok, #state{key=Key, error_fun=ErrorFun}}.
+init([Key]) ->
+    {ok, #state{key=Key}}.
 
 handle_call(stop, _From, State) ->
     {stop, normal, stopped, State};
 
 handle_call({send, RegIds, Message}, _From, #state{key=Key} = State) ->
-    Reply = do_push(RegIds, Message, Key, undefined),
+    Reply = do_push(RegIds, Message, Key),
     {reply, Reply, State};
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
 
-handle_cast({send, RegIds, Message}, #state{key=Key, error_fun=ErrorFun} = State) ->
-    do_push(RegIds, Message, Key, ErrorFun),
+handle_cast({send, RegIds, Message}, #state{key=Key} = State) ->
+    do_push(RegIds, Message, Key),
     {noreply, State};
-
-handle_cast({error_fun, Fun}, State) ->
-    NewState = State#state{error_fun=Fun},
-    {noreply, NewState};
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -72,85 +59,44 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 %% Internal
-do_push(RegIds, Message, Key, ErrorFun) ->
+do_push(RegIds, Message, Key) ->
     error_logger:info_msg("Sending message: ~p to reg ids: ~p~n", [Message, RegIds]),
     case gcm_api:push(RegIds, Message, Key) of
         {ok, GCMResult} ->
-            handle_result(GCMResult, RegIds, ErrorFun);
+            handle_result(GCMResult, RegIds);
         {error, {retry, RetryTime}} ->
-            do_backoff(RetryTime, RegIds, Message, Key, ErrorFun),
+            do_backoff(RetryTime, RegIds, Message, Key),
             {error, retry};
         {error, Reason} ->
             {error, Reason}
     end.
 
-handle_result(GCMResult, RegIds, undefined) ->
+handle_result(GCMResult, RegIds) ->
     {_MulticastId, _SuccessesNumber, _FailuresNumber, _CanonicalIdsNumber, Results} = GCMResult,
     lists:map(fun({Result, RegId}) ->
-		      parse_result(Result, RegId, fun(E, I) -> {E, I} end)
-	      end, lists:zip(Results, RegIds));
+		      parse_result(Result, RegId)
+	      end, lists:zip(Results, RegIds)).
 
-handle_result(GCMResult, RegIds, ErrorFun) ->
-    {_MulticastId, _SuccessesNumber, FailuresNumber, CanonicalIdsNumber, Results} = GCMResult,
-    case to_be_parsed(FailuresNumber, CanonicalIdsNumber) of
-        true ->
-            lists:foreach(fun({Result, RegId}) -> parse_result(Result, RegId, ErrorFun) end,
-			  lists:zip(Results, RegIds));
-        false ->
-            ok
-    end.
-
-do_backoff(RetryTime, RegIds, Message, Key, ErrorFun) ->
+do_backoff(RetryTime, RegIds, Message, Key) ->
     case RetryTime of
         no_retry ->
             ok;
 	Time ->
-	    timer:apply_after(Time * 1000, ?MODULE, do_push, [RegIds, Message, Key, ErrorFun])
+	    timer:apply_after(Time * 1000, ?MODULE, do_push, [RegIds, Message, Key])
     end.
 
-to_be_parsed(0, 0) -> false;
-
-to_be_parsed(_FailureNumber, _CanonicalNumber) -> true.
-
-parse_result(Result, RegId, ErrorFun) ->
+parse_result(Result, RegId) ->
     case {
       proplists:get_value(<<"error">>, Result),
       proplists:get_value(<<"message_id">>, Result),
       proplists:get_value(<<"registration_id">>, Result)
      } of
         {Error, undefined, undefined} when Error =/= undefined ->
-            ErrorFun(Error, RegId);
+            error_logger:info_msg("Error: ~p for registered id: ~p~n", [Error, RegId]),
+            {RegId, Error};
         {undefined, MessageId, undefined} when MessageId =/= undefined ->
             ok;
         {undefined, MessageId, NewRegId} when MessageId =/= undefined andalso NewRegId =/= undefined ->
-            ErrorFun(<<"NewRegistrationId">>, {RegId, NewRegId})
+            error_logger:info_msg("Message sent. Update id ~p with new id ~p.~n", [RegId, NewRegId]),
+            {RegId, {<<"NewRegistrationId">>, NewRegId}}
     end.
-
-log_error(<<"NewRegistrationId">>, {RegId, NewRegId}) ->
-    error_logger:info_msg("Message sent. Update id ~p with new id ~p.~n", [RegId, NewRegId]),
-    ok;
-
-log_error(<<"Unavailable">>, RegId) ->
-    %% The server couldn't process the request in time. Retry later with exponential backoff.
-    error_logger:error_msg("unavailable ~p~n", [RegId]),
-    ok;
-
-log_error(<<"InternalServerError">>, RegId) ->
-    % GCM had an internal server error. Retry later with exponential backoff.
-    error_logger:error_msg("internal server error ~p~n", [RegId]),
-    ok;
-
-log_error(<<"InvalidRegistration">>, RegId) ->
-    %% Invalid registration id in database.
-    error_logger:error_msg("invalid registration ~p~n", [RegId]),
-    ok;
-
-log_error(<<"NotRegistered">>, RegId) ->
-    %% Application removed. Delete device from database.
-    error_logger:error_msg("not registered ~p~n", [RegId]),
-    ok;
-
-log_error(UnexpectedError, RegId) ->
-    %% There was an unexpected error that couldn't be identified.
-    error_logger:error_msg("unexpected error ~p in ~p~n", [UnexpectedError, RegId]),
-    ok.
