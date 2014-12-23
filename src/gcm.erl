@@ -10,7 +10,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {key, retry_after, error_fun}).
+-record(state, {key, error_fun}).
 
 start(Name, Key) ->
     start(Name, Key, fun log_error/2).
@@ -38,7 +38,7 @@ start_link(Name, Key, ErrorFun) ->
     gen_server:start_link({local, Name}, ?MODULE, [Key, ErrorFun], []).
 
 init([Key, ErrorFun]) ->
-    {ok, #state{key=Key, retry_after=0, error_fun=ErrorFun}}.
+    {ok, #state{key=Key, error_fun=ErrorFun}}.
 
 handle_call(stop, _From, State) ->
     {stop, normal, stopped, State};
