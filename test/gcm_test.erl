@@ -30,7 +30,7 @@ send_valid_message(Pid) ->
 			Reply = <<"{\"multicast_id\":\"whatever\",\"success\":1,\"results\":[{\"message_id\":\"1:0408\"}]}">>,
 			Pid ! {ok, {{"", 200, ""}, [], Reply}}
 		end),
-    gcm:push(test, [<<"Token">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
+    gcm:push(test, [<<"RegId">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
     receive
         Any -> [
                 {"Status is 200", ?_assertMatch({ok, {{_,200,_}, [], _JSON}}, Any)},
@@ -43,7 +43,7 @@ send_malformed_json(Pid) ->
 		fun(post, {_BaseURL, _AuthHeader, "application/json", _MalformedJSON}, [], []) ->
 			Pid ! {ok, {{"", 400, ""}, [], []}}
 		end),
-    gcm:push(test, [<<"Token">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
+    gcm:push(test, [<<"RegId">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
     receive
         Any -> [
                 {"Status is 400", ?_assertMatch({ok, {{_, 400, _}, [], []}}, Any)},
@@ -56,7 +56,7 @@ send_wrong_auth(Pid) ->
 		fun(post, {_BaseURL, _WrongAuthHeader, "application/json", _JSON}, [], []) ->
 			Pid ! {ok, {{"", 401, ""}, [], []}}
 		end),
-    gcm:push(test, [<<"Token">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
+    gcm:push(test, [<<"RegId">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
     receive
         Any -> [
                 {"Status is 401", ?_assertMatch({ok, {{_, 401, _}, [], []}}, Any)},
@@ -69,7 +69,7 @@ send_gcm_down(Pid) ->
 		fun(post, {_BaseURL, _WrongAuthHeader, "application/json", _JSON}, [], []) ->
 			Pid ! {ok, {{"", 503, ""}, [], []}}
 		end),
-    gcm:push(test, [<<"Token">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
+    gcm:push(test, [<<"RegId">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
     receive
         Any -> [
                 {"Status is 503", ?_assertMatch({ok, {{_, 503, _}, [], []}}, Any)},
@@ -83,15 +83,14 @@ receive_results_from_sync_push(_) ->
             Reply = <<"{\"multicast_id\":\"whatever\",\"success\":1,\"results\":
                 [{\"message_id\":\"1:0408\"},
                  {\"error\": \"InvalidRegistration\"},
-                 {\"message_id\": \"1:2342\", \"registration_id\": \"NewToken\"}]}">>,
+                 {\"message_id\": \"1:2342\", \"registration_id\": \"NewRegId\"}]}">>,
             {ok, {{"", 200, ""}, [], Reply}}
         end),
-    Result = gcm:sync_push(test, [<<"Token0">>, <<"Token1">>, <<"Token2">>],
+    Result = gcm:sync_push(test, [<<"RegId0">>, <<"RegId1">>, <<"RegId2">>],
         [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
-    ExpectedResult = [ok, {<<"Token1">>, <<"InvalidRegistration">>},
-        {<<"Token2">>, {<<"NewRegistrationId">>, <<"NewToken">>}}],
+    ExpectedResult = [ok, {<<"RegId1">>, <<"InvalidRegistration">>},
+        {<<"RegId2">>, {<<"NewRegistrationId">>, <<"NewRegId">>}}],
     [
         {"Results are passed to the caller", ?_assertMatch(ExpectedResult, Result)},
         {"Validate httpc", ?_assert(meck:validate(httpc))}
     ].
-
