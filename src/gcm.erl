@@ -74,7 +74,7 @@ do_push(RegIds, Message, Key) ->
 handle_result(GCMResult, RegIds) ->
     {_MulticastId, _SuccessesNumber, _FailuresNumber, _CanonicalIdsNumber, Results} = GCMResult,
     lists:map(fun({Result, RegId}) ->
-		      {RegId, parse_result(Result)}
+		      {RegId, parse(Result)}
 	      end, lists:zip(Results, RegIds)).
 
 do_backoff(RetryTime, RegIds, Message, Key) ->
@@ -85,7 +85,7 @@ do_backoff(RetryTime, RegIds, Message, Key) ->
 	    timer:apply_after(Time * 1000, ?MODULE, do_push, [RegIds, Message, Key])
     end.
 
-parse_result(Result) ->
+parse(Result) ->
     case {
       proplists:get_value(<<"error">>, Result),
       proplists:get_value(<<"message_id">>, Result),
