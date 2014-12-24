@@ -74,7 +74,7 @@ do_push(RegIds, Message, Key) ->
 handle_result(GCMResult, RegIds) ->
     {_MulticastId, _SuccessesNumber, _FailuresNumber, _CanonicalIdsNumber, Results} = GCMResult,
     lists:map(fun({Result, RegId}) ->
-		      parse_result(Result, RegId)
+		      {RegId, parse_result(Result)}
 	      end, lists:zip(Results, RegIds)).
 
 do_backoff(RetryTime, RegIds, Message, Key) ->
@@ -85,18 +85,16 @@ do_backoff(RetryTime, RegIds, Message, Key) ->
 	    timer:apply_after(Time * 1000, ?MODULE, do_push, [RegIds, Message, Key])
     end.
 
-parse_result(Result, RegId) ->
+parse_result(Result) ->
     case {
       proplists:get_value(<<"error">>, Result),
       proplists:get_value(<<"message_id">>, Result),
       proplists:get_value(<<"registration_id">>, Result)
      } of
         {Error, undefined, undefined} when Error =/= undefined ->
-            error_logger:info_msg("Error: ~p for registered id: ~p~n", [Error, RegId]),
-            {RegId, Error};
+            Error;
         {undefined, MessageId, undefined} when MessageId =/= undefined ->
-            {RegId, ok};
+            ok;
         {undefined, MessageId, NewRegId} when MessageId =/= undefined andalso NewRegId =/= undefined ->
-            error_logger:info_msg("Message sent. Update id ~p with new id ~p.~n", [RegId, NewRegId]),
-            {RegId, {<<"NewRegistrationId">>, NewRegId}}
+            {<<"NewRegistrationId">>, NewRegId}
     end.
