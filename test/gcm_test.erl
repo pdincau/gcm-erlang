@@ -26,7 +26,7 @@ receive_results_from_sync_push(_) ->
 
     Actual = gcm:sync_push(test, RegIds, Message),
 
-    Expected = [ok, {<<"RegId1">>, <<"InvalidRegistration">>},
+    Expected = [{<<"RegId0">>, ok}, {<<"RegId1">>, <<"InvalidRegistration">>},
                 {<<"RegId2">>, {<<"NewRegistrationId">>, <<"NewRegId">>}}],
     [
      {"Results are passed to the caller", ?_assertMatch(Expected, Actual)},

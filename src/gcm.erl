@@ -95,7 +95,7 @@ parse_result(Result, RegId) ->
             error_logger:info_msg("Error: ~p for registered id: ~p~n", [Error, RegId]),
             {RegId, Error};
         {undefined, MessageId, undefined} when MessageId =/= undefined ->
-            ok;
+            {RegId, ok};
         {undefined, MessageId, NewRegId} when MessageId =/= undefined andalso NewRegId =/= undefined ->
             error_logger:info_msg("Message sent. Update id ~p with new id ~p.~n", [RegId, NewRegId]),
             {RegId, {<<"NewRegistrationId">>, NewRegId}}
