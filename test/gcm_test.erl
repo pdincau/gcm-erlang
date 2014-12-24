@@ -34,7 +34,7 @@ receive_results_from_sync_push(_) ->
     ].
 
 mock_gcm_api() ->
-    Result = {<<"anyMulticastId">>, 1, 0, 0, [[{<<"message_id">>,<<"1:0408">>}],
+    Result = {<<"anyMulticastId">>, 2, 1, 1, [[{<<"message_id">>,<<"1:0408">>}],
                                               [{<<"error">>,<<"InvalidRegistration">>}],
                                               [{<<"message_id">>,<<"1:2342">>},
                                                {<<"registration_id">>,<<"NewRegId">>}]]},
