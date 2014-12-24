@@ -64,8 +64,8 @@ do_push(RegIds, Message, Key) ->
     case gcm_api:push(RegIds, Message, Key) of
         {ok, GCMResult} ->
             handle_result(GCMResult, RegIds);
-        {error, {retry, RetryTime}} ->
-            do_backoff(RetryTime, RegIds, Message, Key),
+        {error, {retry, RetryAfter}} ->
+            do_backoff(RetryAfter, RegIds, Message, Key),
             {error, retry};
         {error, Reason} ->
             {error, Reason}
@@ -77,8 +77,8 @@ handle_result(GCMResult, RegIds) ->
 		      {RegId, parse(Result)}
 	      end, lists:zip(Results, RegIds)).
 
-do_backoff(RetryTime, RegIds, Message, Key) ->
-    case RetryTime of
+do_backoff(RetryAfter, RegIds, Message, Key) ->
+    case RetryAfter of
         no_retry ->
             ok;
 	Time ->
