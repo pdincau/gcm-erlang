@@ -17,6 +17,7 @@ push(RegIds, Message, Key) ->
     try httpc:request(post, {?BASEURL, [{"Authorization", ApiKey}], "application/json", Request}, [], []) of
         {ok, {{_, 200, _}, _Headers, Body}} ->
             Json = jsx:decode(response_to_binary(Body)),
+            error_logger:info_msg("Result was: ~p~n", [Json]),
             {ok, result_from(Json)};
         {ok, {{_, 400, _}, _, _}} ->
 	    error_logger:error_msg("Error in request. Reason was: json_error~n", []),
