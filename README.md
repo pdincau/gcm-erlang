@@ -99,26 +99,7 @@ or simply:
 
 `gcm-erlang` will push the message for you to `Google Cloud Messaging` servers and will parse the JSON provided as result.
 
-In case of errors you can catch the output with a callback function. You only need to start the GCM gen_server in this way:
-
-    9> Callback = fun(Error, RegId) -> io:format("~p ~p~n", [RegId, Error]) end.
-    10> gcm:start(foo, "apikey", Callback).
-
-The first param is always a binary with the error and the second param can be a binary with the Registered ID or a tuple refering to the Old Registered ID and the New Registered ID. All of the errors you can handle are in this list are:
-
-- `NewRegistrationId`, send the OldRegID and NewRegID as a tuple in the second param.
-- `Unavailable`, you should retry the request (use exponential back-off).
-- `InternalServerError`, you should retry the request (use exponential back-off).
-- `InvalidRegistration`, the RedID isn't valid, you should remove it from your database.
-- `NotRegistered`, the RegID isn't valid, you should remove it from your database.
-- `MissingRegistration` the RegID isn't valid, you should remove it from your database.
-- `MessageTooBig`, the message is too big, so you should send another shorter.
-- `InvalidDataKey`, the API KEY is invalid, you should stop the server and reconfigure it!
-- `InvalidTtl`, the TTL (time to live) has an invalid value, stop and reconfigure it!
-- `MismatchSenderId`, you miss send the sender id, drop the message.
-- `InvalidPackageName`, package name invalid, drop the message.
-
-Read this for futher details see: [Interpreting an error response](http://developer.android.com/google/gcm/gcm.html#response).
+In order to understand errors see: [Interpreting an error response](http://developer.android.com/google/gcm/gcm.html#response).
 
 ### Note:
 
