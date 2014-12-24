@@ -91,10 +91,10 @@ parse(Result) ->
       proplists:get_value(<<"message_id">>, Result),
       proplists:get_value(<<"registration_id">>, Result)
      } of
-        {Error, undefined, undefined} when Error =/= undefined ->
+        {Error, undefined, undefined} ->
             Error;
-        {undefined, MessageId, undefined} when MessageId =/= undefined ->
+        {undefined, _MessageId, undefined}  ->
             ok;
-        {undefined, MessageId, NewRegId} when MessageId =/= undefined andalso NewRegId =/= undefined ->
+        {undefined, _MessageId, NewRegId} ->
             {<<"NewRegistrationId">>, NewRegId}
     end.
