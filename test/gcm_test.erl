@@ -8,89 +8,35 @@
 start() ->
     error_logger:tty(false),
     {ok, _} = gcm:start_link(test, "APIKEY"),
-    meck:new(httpc),
+    meck:new(gcm_api),
     _Pid = self().
 
 stop(_Pid) ->
-    meck:unload(httpc),
+    meck:unload(gcm_api),
     gcm:stop(test).
 
-gcm_message_test_() ->
-    [{"It gets a 200 when message is correct", ?setup(fun send_valid_message/1)},
-     {"It gets a 400 when message contains malformed json", ?setup(fun send_malformed_json/1)},
-     {"It gets a 401 when message has wrong auth", ?setup(fun send_wrong_auth/1)},
-     {"It gets a 503 when GCM servers are down", ?setup(fun send_gcm_down/1)}].
-
 gcm_sync_test_() ->
-    [{"Doing a sync_push returns the result information", ?setup(fun receive_results_from_sync_push/1)}].
-
-send_valid_message(Pid) ->
-    meck:expect(httpc, request,
-		fun(post, {_BaseURL, _AuthHeader, "application/json", _JSON}, [], []) ->
-			Reply = <<"{\"multicast_id\":\"whatever\",\"success\":1,\"results\":[{\"message_id\":\"1:0408\"}]}">>,
-			Pid ! {ok, {{"", 200, ""}, [], Reply}}
-		end),
-    gcm:push(test, [<<"RegId">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
-    receive
-        Any -> [
-                {"Status is 200", ?_assertMatch({ok, {{_,200,_}, [], _JSON}}, Any)},
-                {"Validate httpc", ?_assert(meck:validate(httpc))}
-               ]
-    end.
-
-send_malformed_json(Pid) ->
-    meck:expect(httpc, request,
-		fun(post, {_BaseURL, _AuthHeader, "application/json", _MalformedJSON}, [], []) ->
-			Pid ! {ok, {{"", 400, ""}, [], []}}
-		end),
-    gcm:push(test, [<<"RegId">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
-    receive
-        Any -> [
-                {"Status is 400", ?_assertMatch({ok, {{_, 400, _}, [], []}}, Any)},
-                {"Validate httpc", ?_assert(meck:validate(httpc))}
-               ]
-    end.
-
-send_wrong_auth(Pid) ->
-    meck:expect(httpc, request,
-		fun(post, {_BaseURL, _WrongAuthHeader, "application/json", _JSON}, [], []) ->
-			Pid ! {ok, {{"", 401, ""}, [], []}}
-		end),
-    gcm:push(test, [<<"RegId">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
-    receive
-        Any -> [
-                {"Status is 401", ?_assertMatch({ok, {{_, 401, _}, [], []}}, Any)},
-                {"Validate httpc", ?_assert(meck:validate(httpc))}
-               ]
-    end.
-
-send_gcm_down(Pid) ->
-    meck:expect(httpc, request,
-		fun(post, {_BaseURL, _WrongAuthHeader, "application/json", _JSON}, [], []) ->
-			Pid ! {ok, {{"", 503, ""}, [], []}}
-		end),
-    gcm:push(test, [<<"RegId">>], [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
-    receive
-        Any -> [
-                {"Status is 503", ?_assertMatch({ok, {{_, 503, _}, [], []}}, Any)},
-                {"Validate httpc", ?_assert(meck:validate(httpc))}
-               ]
-    end.
+    [{"sync_push returns the result", ?setup(fun receive_results_from_sync_push/1)}].
 
 receive_results_from_sync_push(_) ->
-    meck:expect(httpc, request,
-        fun(post, {_BaseURL, _AuthHeader, "application/json", _JSON}, [], []) ->
-            Reply = <<"{\"multicast_id\":\"whatever\",\"success\":1,\"results\":
-                [{\"message_id\":\"1:0408\"},
-                 {\"error\": \"InvalidRegistration\"},
-                 {\"message_id\": \"1:2342\", \"registration_id\": \"NewRegId\"}]}">>,
-            {ok, {{"", 200, ""}, [], Reply}}
-        end),
-    Result = gcm:sync_push(test, [<<"RegId0">>, <<"RegId1">>, <<"RegId2">>],
-        [{<<"data">>, [{<<"type">>, <<"wakeUp">>}]}]),
-    ExpectedResult = [ok, {<<"RegId1">>, <<"InvalidRegistration">>},
-        {<<"RegId2">>, {<<"NewRegistrationId">>, <<"NewRegId">>}}],
+    RegIds = [<<"RegId0">>, <<"RegId1">>, <<"RegId2">>],
+    Message = [{<<"data">>, [{<<"key">>, <<"value">>}]}],
+
+    mock_gcm_api(),
+
+    Actual = gcm:sync_push(test, RegIds, Message),
+
+    Expected = [ok, {<<"RegId1">>, <<"InvalidRegistration">>},
+                {<<"RegId2">>, {<<"NewRegistrationId">>, <<"NewRegId">>}}],
     [
-        {"Results are passed to the caller", ?_assertMatch(ExpectedResult, Result)},
-        {"Validate httpc", ?_assert(meck:validate(httpc))}
+     {"Results are passed to the caller", ?_assertMatch(Expected, Actual)},
+     {"Calls gcm_api", ?_assert(meck:validate(gcm_api))}
     ].
+
+mock_gcm_api() ->
+    Result = {<<"anyMulticastId">>, 1, 0, 0, [[{<<"message_id">>,<<"1:0408">>}],
+                                              [{<<"error">>,<<"InvalidRegistration">>}],
+                                              [{<<"message_id">>,<<"1:2342">>},
+                                               {<<"registration_id">>,<<"NewRegId">>}]]},
+
+    meck:expect(gcm_api, push, fun(_RegIs, _Message, _APIKey) -> {ok, Result} end).
