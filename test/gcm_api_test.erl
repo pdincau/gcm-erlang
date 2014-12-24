@@ -39,8 +39,8 @@ get_retry_after_when_http_date(_Pid) ->
 mock_httpc_with_retry(Retry) ->
     Headers = case Retry of
                   "" -> [];
-                  RetryTime ->
-                      [{"retry-after", RetryTime}]
+                  RetryAfter ->
+                      [{"retry-after", RetryAfter}]
               end,
 
     meck:expect(httpc, request,
