@@ -73,9 +73,7 @@ do_push(RegIds, Message, Key) ->
 
 handle_result(GCMResult, RegIds) ->
     {_MulticastId, _SuccessesNumber, _FailuresNumber, _CanonicalIdsNumber, Results} = GCMResult,
-    lists:map(fun({Result, RegId}) ->
-		      {RegId, parse(Result)}
-	      end, lists:zip(Results, RegIds)).
+    lists:map(fun({Result, RegId}) -> {RegId, parse(Result)} end, lists:zip(Results, RegIds)).
 
 do_backoff(RetryAfter, RegIds, Message, Key) ->
     case RetryAfter of
