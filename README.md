@@ -6,7 +6,7 @@ gcm-erlang
 This software provides an Erlang client for [`Google Cloud Messaging`](http://developer.android.com/google/gcm/index.html "Google Cloud Messaging for Android").
 
 
-### What can you already do with gcm-erlang:
+### What you can do with gcm-erlang:
 
 Using `gcm-erlang` you can:
 
