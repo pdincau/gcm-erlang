@@ -6,9 +6,10 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
--export([push/3, sync_push/3]).
+-export([push/3, push/4, sync_push/3, sync_push/4]).
 
 -define(SERVER, ?MODULE).
+-define(RETRY, 3).
 
 -record(state, {key}).
 
@@ -19,10 +20,16 @@ stop(Name) ->
     gen_server:call(Name, stop).
 
 push(Name, RegIds, Message) ->
-    gen_server:cast(Name, {send, RegIds, Message}).
+    push(Name, RegIds, Message, 1).
+
+push(Name, RegIds, Message, Retry) ->
+    gen_server:cast(Name, {send, RegIds, Message, Retry}).
 
 sync_push(Name, RegIds, Message) ->
-    gen_server:call(Name, {send, RegIds, Message}).
+    sync_push(Name, RegIds, Message, 1).
+
+sync_push(Name, RegIds, Message, Retry) ->
+    gen_server:call(Name, {send, RegIds, Message, Retry}).
 
 %% OTP
 start_link(Name, Key) ->
@@ -34,16 +41,16 @@ init([Key]) ->
 handle_call(stop, _From, State) ->
     {stop, normal, stopped, State};
 
-handle_call({send, RegIds, Message}, _From, #state{key=Key} = State) ->
-    Reply = do_push(RegIds, Message, Key),
+handle_call({send, RegIds, Message, Retry}, _From, #state{key=Key} = State) ->
+    Reply = do_push(RegIds, Message, Key, Retry),
     {reply, Reply, State};
 
 handle_call(_Request, _From, State) ->
     Reply = ok,
     {reply, Reply, State}.
 
-handle_cast({send, RegIds, Message}, #state{key=Key} = State) ->
-    do_push(RegIds, Message, Key),
+handle_cast({send, RegIds, Message, Retry}, #state{key=Key} = State) ->
+    do_push(RegIds, Message, Key, Retry),
     {noreply, State};
 
 handle_cast(_Msg, State) ->
@@ -59,13 +66,13 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 %% Internal
-do_push(RegIds, Message, Key) ->
-    error_logger:info_msg("Sending message: ~p to reg ids: ~p~n", [Message, RegIds]),
+do_push(RegIds, Message, Key, Retry) ->
+    error_logger:info_msg("Sending message: ~p to reg ids: ~p. Retry number: ~p~n", [Message, RegIds, Retry]),
     case gcm_api:push(RegIds, Message, Key) of
         {ok, GCMResult} ->
             handle_result(GCMResult, RegIds);
         {error, {retry, RetryAfter}} ->
-            do_backoff(RetryAfter, RegIds, Message, Key),
+            do_backoff(RetryAfter, RegIds, Message, Key, Retry),
             {error, retry};
         {error, Reason} ->
             {error, Reason}
@@ -75,12 +82,15 @@ handle_result(GCMResult, RegIds) ->
     {_MulticastId, _SuccessesNumber, _FailuresNumber, _CanonicalIdsNumber, Results} = GCMResult,
     lists:map(fun({Result, RegId}) -> {RegId, parse(Result)} end, lists:zip(Results, RegIds)).
 
-do_backoff(RetryAfter, RegIds, Message, Key) ->
+do_backoff(_, _, _, _, ?RETRY + 1) ->
+    ok;
+
+do_backoff(RetryAfter, RegIds, Message, Key, Retry) ->
     case RetryAfter of
         no_retry ->
             ok;
 	_ ->
-	    timer:apply_after(RetryAfter * 1000, ?MODULE, do_push, [RegIds, Message, Key])
+	    timer:apply_after(RetryAfter * 1000, ?MODULE, do_push, [RegIds, Message, Key, Retry+1])
     end.
 
 parse(Result) ->
