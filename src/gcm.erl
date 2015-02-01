@@ -4,7 +4,7 @@
 -export([start/2, stop/1, start_link/2]).
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-	 terminate/2, code_change/3]).
+         terminate/2, code_change/3]).
 
 -export([push/3, push/4, sync_push/3, sync_push/4]).
 
@@ -70,7 +70,7 @@ do_push(_, _, _, 0) ->
     ok;
 
 do_push(RegIds, Message, Key, Retry) ->
-    error_logger:info_msg("Sending message: ~p to reg ids: ~p.~n", [Message, RegIds, Retry]),
+    error_logger:info_msg("Sending message: ~p to reg ids: ~p retries: ~p.~n", [Message, RegIds, Retry]),
     case gcm_api:push(RegIds, Message, Key) of
         {ok, GCMResult} ->
             handle_result(GCMResult, RegIds);
@@ -89,7 +89,7 @@ do_backoff(RetryAfter, RegIds, Message, Key, Retry) ->
     case RetryAfter of
         no_retry ->
             ok;
-	_ ->
+        _ ->
         error_logger:info_msg("Received retry-after. Will retry: ~p times~n", [Retry-1]),
         timer:apply_after(RetryAfter * 1000, ?MODULE, do_push, [RegIds, Message, Key, Retry - 1])
     end.
