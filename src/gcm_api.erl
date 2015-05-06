@@ -19,9 +19,9 @@ push(RegIds, Message, Key) ->
             Json = jsx:decode(response_to_binary(Body)),
             error_logger:info_msg("Result was: ~p~n", [Json]),
             {ok, result_from(Json)};
-        {ok, {{_, 400, _}, _, _}} ->
-	    error_logger:error_msg("Error in request. Reason was: json_error~n", []),
-            {error, json_error};
+        {ok, {{_, 400, _}, _, Body}} ->
+	    error_logger:error_msg("Error in request. Reason was: Bad Request - ~p~n", [Body]),
+            {error, Body};
         {ok, {{_, 401, _}, _, _}} ->
 	    error_logger:error_msg("Error in request. Reason was: authorization error~n", []),
             {error, auth_error};
