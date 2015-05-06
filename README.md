@@ -26,7 +26,7 @@ The first thing you have to do is to compile all the Erlang files using `rebar`.
 You can use gcm_app as a dependency in your rebar.config:
 
     {deps , [
-        {gcm, ".*", {git, "https://github.com/pdincau/gcm-erlang.git", {tag, "1.0.0"}}}
+        {gcm, ".*", {git, "https://github.com/pdincau/gcm-erlang.git", {tag, "1.0.1"}}}
     ]}.
 
 ###How to run tests:
