@@ -46,8 +46,7 @@ handle_call({send, RegIds, Message, Retry}, _From, #state{key=Key} = State) ->
     {reply, Reply, State};
 
 handle_call(_Request, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State}.
+    {reply, ok, State}.
 
 handle_cast({send, RegIds, Message, Retry}, #state{key=Key} = State) ->
     do_push(RegIds, Message, Key, Retry),
