@@ -74,7 +74,7 @@ do_push(RegIds, Message, Key, Retry) ->
         {ok, GCMResult} ->
             handle_result(GCMResult, RegIds);
         {error, {retry, RetryAfter}} ->
-            do_backoff(RetryAfter, RegIds, Message, Key, Retry),
+            do_backoff(RetryAfter, RegIds, Message, Retry),
             {error, retry};
         {error, Reason} ->
             {error, Reason}
@@ -84,13 +84,13 @@ handle_result(GCMResult, RegIds) ->
     {_MulticastId, _SuccessesNumber, _FailuresNumber, _CanonicalIdsNumber, Results} = GCMResult,
     lists:map(fun({Result, RegId}) -> {RegId, parse(Result)} end, lists:zip(Results, RegIds)).
 
-do_backoff(RetryAfter, RegIds, Message, Key, Retry) ->
+do_backoff(RetryAfter, RegIds, Message, Retry) ->
     case RetryAfter of
         no_retry ->
             ok;
         _ ->
             error_logger:info_msg("Received retry-after. Will retry: ~p times~n", [Retry-1]),
-            timer:apply_after(RetryAfter * 1000, ?MODULE, do_push, [RegIds, Message, Key, Retry - 1])
+            timer:apply_after(RetryAfter * 1000, ?MODULE, push, [self(), RegIds, Message, Retry - 1])
     end.
 
 parse(Result) ->
