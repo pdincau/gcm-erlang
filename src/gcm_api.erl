@@ -1,20 +1,29 @@
 -module(gcm_api).
 -export([push/3]).
+-export([web_push/4]).
 
 -define(BASEURL, "https://android.googleapis.com/gcm/send").
+-define(TEMP_GCM_URL, "https://gcm-http.googleapis.com/gcm").
 
--type header()  :: {string(), string()}.
--type headers() :: [header(),...].
--type regids()  :: [binary(),...].
--type message() :: [tuple(),...].
--type result()  :: {number(), non_neg_integer(), non_neg_integer(), non_neg_integer(), [any()]}.
+-type header()       :: {string(), string()}.
+-type headers()      :: [header(),...].
+-type regid()        :: binary().
+-type regids()       :: [binary(),...].
+-type message()      :: [tuple(),...] | binary().
+-type publicKey()    :: string()|binary().
+-type authTokeny()   :: string()|binary().
+-type result()       :: {number(), non_neg_integer(), non_neg_integer(), non_neg_integer(), [any()]}.
+-type subscription() :: {regid(), publicKey(), authTokeny()}.
 
 -spec push(regids(),message(),string()) -> {'error',any()} | {'noreply','unknown'} | {'ok',result()}.
 push(RegIds, Message, Key) ->
     Request = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
-    ApiKey = string:concat("key=", Key),
+    push(Request, Key, [], ?BASEURL).
 
-    try httpc:request(post, {?BASEURL, [{"Authorization", ApiKey}], "application/json", Request}, [], []) of
+-spec push(message(), string(), headers(), string()) -> {'error',any()} | {'noreply','unknown'} | {'ok',result()}.
+push(Request, Key, Headers, BaseUrl) ->
+    ApiKey = string:concat("key=", Key),
+    try httpc:request(post, {BaseUrl, [{"Authorization", ApiKey}|Headers], "application/json", Request}, [], []) of
         {ok, {{_, 200, _}, _Headers, Body}} ->
             Json = jsx:decode(response_to_binary(Body)),
             error_logger:info_msg("Result was: ~p~n", [Json]),
@@ -40,9 +49,21 @@ push(RegIds, Message, Key) ->
             {noreply, unknown}
     catch
         Exception ->
-            error_logger:error_msg("Error in request. Exception ~p while calling URL: ~p~n", [Exception, ?BASEURL]),
+            error_logger:error_msg("Error in request. Exception ~p while calling URL: ~p~n", [Exception, BaseUrl]),
             {error, Exception}
     end.
+
+-spec web_push(message(), string(), subscription(), number()) -> {'error',any()} | {'noreply','unknown'} | {'ok',result()}.
+web_push(Message, Key, {RegId, ClientPublicKey, ClientAuthToken} = _Subscription, PaddingLength) ->
+    {Ciphertext, Salt, PublicKey} = webpush_encryption:encrypt(jsx:encode(Message), ClientPublicKey, ClientAuthToken, PaddingLength),
+    Headers = [
+        {"Content-Encoding", "aesgcm"}
+        , {"Encryption", "salt=" ++ binary_to_list( base64url:encode(Salt)) }
+        , {"Crypto-Key", "dh=" ++ binary_to_list( base64url:encode(PublicKey)) }
+        , {"TTL", "0"}
+    ],
+    PushServerUri = ?TEMP_GCM_URL ++ "/" ++ binary_to_list(RegId),
+    push(Ciphertext, Key, Headers, PushServerUri).
 
 -spec response_to_binary(binary() | list()) -> binary().
 response_to_binary(Json) when is_binary(Json) ->
