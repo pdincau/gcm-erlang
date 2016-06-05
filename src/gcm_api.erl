@@ -10,10 +10,8 @@
 -type regid()        :: binary().
 -type regids()       :: [binary(),...].
 -type message()      :: [tuple(),...] | binary().
--type publicKey()    :: string()|binary().
--type authTokeny()   :: string()|binary().
 -type result()       :: {number(), non_neg_integer(), non_neg_integer(), non_neg_integer(), [any()]}.
--type subscription() :: {regid(), publicKey(), authTokeny()}.
+-type subscription() :: {regid(), webpush_encryption:publicKey(), webpush_encryption:authTokeny()}.
 
 -spec push(regids(),message(),string()) -> {'error',any()} | {'noreply','unknown'} | {'ok',result()}.
 push(RegIds, Message, Key) ->
@@ -53,9 +51,9 @@ push(Request, Key, Headers, BaseUrl) ->
             {error, Exception}
     end.
 
--spec web_push(message(), string(), subscription(), number()) -> {'error',any()} | {'noreply','unknown'} | {'ok',result()}.
+-spec web_push(message(), string(), subscription(), non_neg_integer()) -> {'error',any()} | {'noreply','unknown'} | {'ok',result()}.
 web_push(Message, Key, {RegId, ClientPublicKey, ClientAuthToken} = _Subscription, PaddingLength) ->
-    {Ciphertext, Salt, PublicKey} = webpush_encryption:encrypt(jsx:encode(Message), ClientPublicKey, ClientAuthToken, PaddingLength),
+    {Ciphertext, Salt, PublicKey} = webpush_encryption:encrypt(jsx:encode(Message), {ClientPublicKey, ClientAuthToken}, PaddingLength),
     Headers = [
         {"Content-Encoding", "aesgcm"}
         , {"Encryption", "salt=" ++ binary_to_list( base64url:encode(Salt)) }
