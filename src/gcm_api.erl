@@ -35,12 +35,12 @@ push(Request, Key, Headers, BaseUrl) ->
         {ok, {{_, 401, _}, _, _}} ->
             error_logger:error_msg("Error in request. Reason was: authorization error~n", []),
             {error, auth_error};
-        {ok, {{_, Code, _}, Headers, _}} when Code >= 500 andalso Code =< 599 ->
-            RetryTime = retry_after_from(Headers),
+        {ok, {{_, Code, _}, RespHeaders, _}} when Code >= 500 andalso Code =< 599 ->
+            RetryTime = retry_after_from(RespHeaders),
             error_logger:error_msg("Error in request. Reason was: retry. Will retry in: ~p~n", [RetryTime]),
             {error, {retry, RetryTime}};
-        {ok, {{StatusLine, Headers, _}, _, _Body}} ->
-            error_logger:error_msg("Error in request. Reason was: timeout1 ~p ~p ~n", [StatusLine, Headers]),
+        {ok, {{StatusLine, RespHeaders, _}, _, _Body}} ->
+            error_logger:error_msg("Error in request. Reason was: timeout1 ~p ~p ~n", [StatusLine, RespHeaders]),
             {error, timeout};
         {error, Reason} ->
             error_logger:error_msg("Error in request. Reason was: ~p~n", [Reason]),
