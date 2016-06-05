@@ -26,6 +26,9 @@ push(Request, Key, Headers, BaseUrl) ->
             Json = jsx:decode(response_to_binary(Body)),
             error_logger:info_msg("Result was: ~p~n", [Json]),
             {ok, result_from(Json)};
+        {ok, {{_, 201, _}, _Headers, _Body}} ->
+            error_logger:info_msg("Result was: Created~n"),
+            {ok, ok};
         {ok, {{_, 400, _}, _, Body}} ->
             error_logger:error_msg("Error in request. Reason was: Bad Request - ~p~n", [Body]),
             {error, Body};
@@ -36,14 +39,14 @@ push(Request, Key, Headers, BaseUrl) ->
             RetryTime = retry_after_from(Headers),
             error_logger:error_msg("Error in request. Reason was: retry. Will retry in: ~p~n", [RetryTime]),
             {error, {retry, RetryTime}};
-        {ok, {{_StatusLine, _, _}, _, _Body}} ->
-            error_logger:error_msg("Error in request. Reason was: timeout~n", []),
+        {ok, {{StatusLine, Headers, _}, _, _Body}} ->
+            error_logger:error_msg("Error in request. Reason was: timeout1 ~p ~p ~n", [StatusLine, Headers]),
             {error, timeout};
         {error, Reason} ->
             error_logger:error_msg("Error in request. Reason was: ~p~n", [Reason]),
             {error, Reason};
         OtherError ->
-            error_logger:error_msg("Error in request. Reason was: ~p~n", [OtherError]),
+            error_logger:error_msg("Error in request. Reason other was: ~p~n", [OtherError]),
             {noreply, unknown}
     catch
         Exception ->

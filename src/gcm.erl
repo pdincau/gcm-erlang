@@ -122,6 +122,14 @@ do_web_push(Message, Key, Subscription, PaddingLength, Retry) ->
         {error, Reason} ->
             {error, Reason}
     end.
+    
+handle_result(ok, {_,_,_} = _Subscription) ->
+    [{<<"multicast_id">>, <<"">>},
+     {<<"success">>,1},
+     {<<"failure">>,0},
+     {<<"canonical_ids">>,0},
+     {<<"results">>, []}
+    ];
 
 handle_result(GCMResult, {_,_,_} = Subscription) ->
     {_MulticastId, _SuccessesNumber, _FailuresNumber, _CanonicalIdsNumber, Results} = GCMResult,
