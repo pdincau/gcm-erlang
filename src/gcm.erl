@@ -115,25 +115,13 @@ do_web_push(Message, Key, Subscription, PaddingLength, Retry) ->
     error_logger:info_msg("Sending web push message: ~p to subscription: ~p retries: ~p.~n", [Message, Subscription, Retry]),
     case gcm_api:web_push(Message, Key, Subscription, PaddingLength) of
         {ok, GCMResult} ->
-            handle_result(GCMResult, Subscription);
+            handle_result(GCMResult, [Subscription]);
         {error, {retry, RetryAfter}} ->
             do_backoff(RetryAfter, Subscription, Message, Retry),
             {error, retry};
         {error, Reason} ->
             {error, Reason}
     end.
-    
-handle_result(ok, {_,_,_} = _Subscription) ->
-    [{<<"multicast_id">>, <<"">>},
-     {<<"success">>,1},
-     {<<"failure">>,0},
-     {<<"canonical_ids">>,0},
-     {<<"results">>, []}
-    ];
-
-handle_result(GCMResult, {_,_,_} = Subscription) ->
-    {_MulticastId, _SuccessesNumber, _FailuresNumber, _CanonicalIdsNumber, Results} = GCMResult,
-    lists:map(fun({Result, RegId}) -> {RegId, parse(Result)} end, lists:zip(Results, Subscription));
 
 handle_result(GCMResult, RegIds) ->
     {_MulticastId, _SuccessesNumber, _FailuresNumber, _CanonicalIdsNumber, Results} = GCMResult,

@@ -6,7 +6,7 @@
 -define(TEMP_GCM_URL, "https://gcm-http.googleapis.com/gcm").
 
 -type header()       :: {string(), string()}.
--type headers()      :: [header(),...].
+-type headers()      :: [header()].
 -type regid()        :: binary().
 -type regids()       :: [binary(),...].
 -type message()      :: [tuple(),...] | binary().
@@ -18,7 +18,7 @@ push(RegIds, Message, Key) ->
     Request = jsx:encode([{<<"registration_ids">>, RegIds}|Message]),
     push(Request, Key, [], ?BASEURL).
 
--spec push(message(), string(), headers(), string()) -> {'error',any()} | {'noreply','unknown'} | {'ok',result()}.
+-spec push(message(), string(), headers(), string()) -> {'error',any()} | {'noreply','unknown'} | {'ok',result()} | {'ok','ok'}.
 push(Request, Key, Headers, BaseUrl) ->
     ApiKey = string:concat("key=", Key),
     try httpc:request(post, {BaseUrl, [{"Authorization", ApiKey}|Headers], "application/json", Request}, [], []) of
@@ -26,9 +26,9 @@ push(Request, Key, Headers, BaseUrl) ->
             Json = jsx:decode(response_to_binary(Body)),
             error_logger:info_msg("Result was: ~p~n", [Json]),
             {ok, result_from(Json)};
-        {ok, {{_, 201, _}, _Headers, _Body}} ->
+        {ok, {{_, 201, _}, _Headers, _Body}} ->				% web push success result
             error_logger:info_msg("Result was: Created~n"),
-            {ok, ok};
+            {ok, [{<<"multicast_id">>, <<"">>},{<<"success">>,1},{<<"failure">>,0},{<<"canonical_ids">>,0},{<<"results">>, []} ] };
         {ok, {{_, 400, _}, _, Body}} ->
             error_logger:error_msg("Error in request. Reason was: Bad Request - ~p~n", [Body]),
             {error, Body};
